@@ -288,7 +288,7 @@ export default function Home() {
           {screen === 'pass' && (
             <div style={{
               position: 'fixed', inset: 0, zIndex: 400,
-              background: 'rgba(13,15,20,0.92)',
+              background: 'rgb(13,15,20)',
               display: 'flex', flexDirection: 'column',
               alignItems: 'center', justifyContent: 'center', gap: 24,
             }}>
