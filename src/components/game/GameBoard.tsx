@@ -234,7 +234,6 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
   const prevFieldImageRef = useRef<string | null>(null);
   const fieldLeaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [narration, setNarration] = useState<string | null>(null);
-  const [handExpanded, setHandExpanded] = useState(false);
   const handContainerRef = useRef<HTMLDivElement>(null);
   const [handContainerW, setHandContainerW] = useState(390);
   const prevStateSnap = useRef<{
@@ -1682,7 +1681,7 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
       )}
 
       {/* Battle zone */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 0, flex: 1, overflow: 'hidden', minHeight: 0, position: 'relative' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 0, flex: 1, overflow: 'hidden', minHeight: 0, position: 'relative', justifyContent: 'center' }}>
 
         {/* Beam clash — sits across full battle zone width */}
         {beamClash && (
@@ -1821,8 +1820,8 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
           </div>
         </div>
 
-        {/* Spacer to fill center vertical space */}
-        <div style={{ flex: 1 }} />
+        {/* Small gap between opp and player actives */}
+        <div style={{ height: 12, flexShrink: 0 }} />
 
         {/* Player actives */}
         <div style={{ display: 'flex', justifyContent: 'center', gap: 4, padding: '4px 12px 6px', background: 'transparent', flexShrink: 0 }}>
@@ -1904,13 +1903,14 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
       </div>
 
 
-      {/* Player hand */}
+      {/* Player hand — pulled up slightly so cards overlap bottom of bench */}
       <div style={{
         background: 'transparent',
         flexShrink: 0,
         paddingBottom: 'max(8px, env(safe-area-inset-bottom))',
         position: 'relative',
         zIndex: 10,
+        marginTop: -14,
       }}>
         {/* Draw pile buttons */}
         {state.phase === 'draw' && !isFirstPlayerTurn1 && isMyTurn && (
@@ -1948,28 +1948,11 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
           </div>
         )}
 
-        {/* Hand drawer handle */}
-        <div
-          onClick={() => setHandExpanded(v => !v)}
-          style={{
-            display: 'flex', justifyContent: 'center', alignItems: 'center',
-            height: 20, cursor: 'pointer', gap: 6,
-          }}
-        >
-          <div style={{ width: 32, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.18)' }} />
-          <span style={{
-            fontFamily: 'Saira Condensed, sans-serif', fontSize: 8,
-            color: 'rgba(255,255,255,0.22)', textTransform: 'uppercase', letterSpacing: 1,
-          }}>
-            {handExpanded ? '▼' : '▲'} HAND ({handToShow.length})
-          </span>
-          <div style={{ width: 32, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.18)' }} />
-        </div>
         {/* Scrollable card row */}
         <div
           ref={handContainerRef}
           className="hand-drawer"
-          style={{ maxHeight: handExpanded ? 'min(160px, 22dvh)' : 'max(96px, 12dvh)' }}
+          style={{ minHeight: 'min(132px, 16dvh)', overflow: 'visible' }}
         >
         <div
           className="hand-scroll"
@@ -1986,7 +1969,12 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
         >
           {(() => {
             const CARD_W = 86;
-            const handCount = handToShow.length;
+            // Preserve original indices, then hide the card being actively dragged
+            const allWithIdx = handToShow.map((cid, idx) => ({ cardId: cid, origIdx: idx }));
+            const displayHand = (drag?.active && drag.handIdx != null)
+              ? allWithIdx.filter(({ origIdx }) => origIdx !== drag.handIdx)
+              : allWithIdx;
+            const handCount = displayHand.length;
             const fanCenter = (handCount - 1) / 2;
             const fanAngleStep = Math.min(7, 28 / Math.max(handCount - 1, 1));
             // Compute the minimum overlap so the full hand fits without scrolling.
@@ -1997,31 +1985,31 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
               : 0;
             // clamp: never less than 26 (existing look), never more than 62 (keep cards readable)
             const overlap = Math.max(26, Math.min(Math.ceil(rawOverlap), 62));
-            return handToShow.map((cardId, i) => {
+            return displayHand.map(({ cardId, origIdx }, i) => {
             const isHandSelected = selection.mode === 'hand_card_selected' && selection.cardId === cardId;
             const isPlayable = playableCards.has(cardId);
             const canDrag = isMyTurn && isPlayable && isMainPhase;
 
             return (
               <div
-                key={`${cardId}-${i}`}
+                key={`${cardId}-${origIdx}`}
                 onPointerDown={(e) => {
                   if (!canDrag) return;
                   e.preventDefault();
                   e.currentTarget.setPointerCapture(e.pointerId);
                   const info: DragInfo = {
-                    cardId, handIdx: i,
+                    cardId, handIdx: origIdx,
                     startX: e.clientX, startY: e.clientY,
                     x: e.clientX, y: e.clientY,
                     active: false,
                   };
                   dragRef.current = info;
                   setDrag(info);
-                  setSelection({ mode: 'hand_card_selected', handIdx: i, cardId });
+                  setSelection({ mode: 'hand_card_selected', handIdx: origIdx, cardId });
                 }}
                 onPointerMove={(e) => {
                   const d = dragRef.current;
-                  if (!d || d.handIdx !== i) return;
+                  if (!d || d.handIdx !== origIdx) return;
                   const dist = Math.hypot(e.clientX - d.startX, e.clientY - d.startY);
                   const active = d.active || dist >= 8;
                   const updated = { ...d, x: e.clientX, y: e.clientY, active };
@@ -2030,19 +2018,19 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
                 }}
                 onPointerUp={(e) => {
                   const d = dragRef.current;
-                  if (!d || d.handIdx !== i) {
-                    setZoomedCard({ cardId, handIdx: i });
+                  if (!d || d.handIdx !== origIdx) {
+                    setZoomedCard({ cardId, handIdx: origIdx });
                     return;
                   }
                   if (!d.active) {
                     dragRef.current = null;
                     setDrag(null);
                     setSelection({ mode: 'idle' });
-                    setZoomedCard({ cardId, handIdx: i });
+                    setZoomedCard({ cardId, handIdx: origIdx });
                   }
                 }}
                 onPointerCancel={() => {
-                  if (dragRef.current?.handIdx === i) {
+                  if (dragRef.current?.handIdx === origIdx) {
                     dragRef.current = null;
                     setDrag(null);
                     setSelection({ mode: 'idle' });
@@ -2061,7 +2049,7 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
                   marginLeft: i > 0 ? -overlap : 0,
                 }}
               >
-                <HandCard cardId={cardId} isSelected={isHandSelected || (drag?.active === true && drag.cardId === cardId)} />
+                <HandCard cardId={cardId} isSelected={isHandSelected} />
               </div>
             );
           });
