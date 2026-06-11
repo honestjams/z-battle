@@ -1,4 +1,4 @@
-import { GameState, PlayerId } from './types';
+import { GameState, PlayerId, PendingPromotion } from './types';
 import { getCard } from './cards';
 import { getEffectiveStats } from './buffs';
 import { checkWinLoss } from './utils';
@@ -63,19 +63,17 @@ export function resolveKo(
   // Trigger Cell Bio-Absorption: heal when Cell scores a KO
   s = triggerBioAbsorption(s, attackerSide);
 
-  // Check if Frieza has Emperor's Wrath pending
-  const friezaWrathPending = hasFriezaWrathTrigger(s, attackerSide);
-
-  // Promote: if an active slot is now empty, promote from bench
+  // Queue a pending promotion instead of auto-promoting — lets the player choose which bench card to send in.
+  // Emperor's Wrath damage fires after the player confirms their choice (handled in promote_from_bench).
   if (slot === 'active' && !skipAutoPromote) {
-    s = promoteFromBench(s, koDSide, index);
-  }
-
-  // Fire Emperor's Wrath on the newly promoted fighter
-  if (friezaWrathPending) {
-    const newFighter = s.players[koDSide].actives[index];
-    if (newFighter) {
-      s = applyDamageToFighter(s, koDSide, 'active', index, 2000);
+    const hasBench = s.players[koDSide].bench.some(b => b !== null);
+    if (hasBench) {
+      const entry: PendingPromotion = {
+        side: koDSide,
+        activeIndex: index,
+        friezaWrathPending: hasFriezaWrathTrigger(s, attackerSide),
+      };
+      s = { ...s, pendingPromotions: [...s.pendingPromotions, entry] };
     }
   }
 

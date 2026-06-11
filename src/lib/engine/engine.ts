@@ -324,15 +324,28 @@ export function applyIntent(state: GameState, intent: Intent): GameState {
       break;
     }
 
+    case 'promote_from_bench': {
+      const pending = s.pendingPromotions[0];
+      if (!pending) throw new Error('No pending promotion');
+      const { side, activeIndex, friezaWrathPending } = pending;
+      s = { ...s, pendingPromotions: s.pendingPromotions.slice(1) };
+      s = promoteSpecific(s, side, activeIndex, intent.benchIndex);
+      if (friezaWrathPending) {
+        const promoted = s.players[side].actives[activeIndex];
+        if (promoted) s = applyDamageToFighter(s, side, 'active', activeIndex, 2000);
+      }
+      s = checkWinLoss(s);
+      break;
+    }
+
     case 'sacrifice': {
       if (s.turnPlayer !== tp) throw new Error('Can only sacrifice on your own turn');
 
       if (intent.side === 'active') {
-        // Active sacrifice counts as a KO — opponent scores
+        // Active sacrifice counts as a KO — opponent scores; bench promotion queued as pendingPromotion
         const fighter = s.players[tp].actives[intent.index];
         if (!fighter) throw new Error('No fighter in that slot');
         s = resolveKo(s, tp, 'active', intent.index, opponent);
-        s = promoteFromBench(s, tp, intent.index);
       } else {
         // Bench sacrifice is free — no KO scored
         const player = { ...s.players[tp] };

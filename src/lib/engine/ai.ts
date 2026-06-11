@@ -4,6 +4,13 @@ import { getCard } from './cards';
 import { getEffectiveStats } from './buffs';
 
 export function chooseMove(state: GameState, player: PlayerId): Intent | null {
+  // Resolve any pending promotion for this player before anything else
+  if (state.pendingPromotions.length > 0 && state.pendingPromotions[0].side === player) {
+    const bench = state.players[player].bench;
+    const benchIdx = bench.map((f, i) => (f ? i : -1)).filter(i => i !== -1);
+    if (benchIdx.length > 0) return { type: 'promote_from_bench', benchIndex: benchIdx[0] };
+  }
+
   const moves = legalMoves(state, player);
   if (moves.length === 0) return null;
 

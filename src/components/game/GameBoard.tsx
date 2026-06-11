@@ -208,6 +208,16 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
   const [retreatAnimFlying, setRetreatAnimFlying] = useState(false);
   const retreatAnimTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  type PromoteAnim = {
+    cardId: string;
+    fromX: number; fromY: number;
+    toX: number; toY: number;
+    w: number; h: number;
+  };
+  const [promoteAnim, setPromoteAnim] = useState<PromoteAnim | null>(null);
+  const [promoteAnimFlying, setPromoteAnimFlying] = useState(false);
+  const promoteAnimTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   type BeamStruggleData = {
     attackerPos: { x: number; y: number };
     defenderPos: { x: number; y: number };
@@ -678,6 +688,41 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
       setRetreatAnimFlying(false);
       cardAnimLock.current = false;
     }, 420);
+  }
+
+  function startPromoteAnim(benchIndex: number, activeIndex: number, cardId: string, onDispatch: () => void) {
+    if (promoteAnimTimerRef.current) clearTimeout(promoteAnimTimerRef.current);
+    const board = boardRef.current;
+    if (!board) { onDispatch(); return; }
+
+    const boardRect = board.getBoundingClientRect();
+    const cx = boardRect.width / 2;
+    const cy = boardRect.height / 2;
+
+    const benchEl = board.querySelector(`[data-subslot="bench"][data-index="${benchIndex}"][data-opp="false"]`);
+    const activeEl = board.querySelector(`[data-subslot="active"][data-index="${activeIndex}"][data-opp="false"]`);
+    if (!benchEl || !activeEl) { onDispatch(); return; }
+
+    const bR = benchEl.getBoundingClientRect();
+    const aR = activeEl.getBoundingClientRect();
+
+    setPromoteAnim({
+      cardId,
+      fromX: bR.left + bR.width / 2 - boardRect.left - cx,
+      fromY: bR.top + bR.height / 2 - boardRect.top - cy,
+      toX: aR.left + aR.width / 2 - boardRect.left - cx,
+      toY: aR.top + aR.height / 2 - boardRect.top - cy,
+      w: isCompact ? 110 : 140,
+      h: isCompact ? 154 : 196,
+    });
+    setPromoteAnimFlying(false);
+    requestAnimationFrame(() => requestAnimationFrame(() => setPromoteAnimFlying(true)));
+
+    promoteAnimTimerRef.current = setTimeout(() => {
+      onDispatch();
+      setPromoteAnim(null);
+      setPromoteAnimFlying(false);
+    }, 430);
   }
 
   // ---- Phase button ----
@@ -1492,6 +1537,98 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
               </div>
             )}
           </>
+        );
+      })()}
+
+      {/* Promotion slide animation — bench card flies to empty active slot */}
+      {promoteAnim && (() => {
+        let card: ReturnType<typeof getCard> | null = null;
+        try { card = getCard(promoteAnim.cardId); } catch { card = null; }
+        return (
+          <div style={{
+            position: 'absolute', left: '50%', top: '50%', zIndex: 342, pointerEvents: 'none',
+            width: promoteAnim.w, height: promoteAnim.h,
+            transform: promoteAnimFlying
+              ? `translate(calc(-50% + ${promoteAnim.toX}px), calc(-50% + ${promoteAnim.toY}px)) scale(1.08)`
+              : `translate(calc(-50% + ${promoteAnim.fromX}px), calc(-50% + ${promoteAnim.fromY}px)) scale(0.7)`,
+            transition: 'transform 0.4s cubic-bezier(0.22, 1, 0.36, 1)',
+            opacity: promoteAnimFlying ? 1 : 0.85,
+          }}>
+            <div style={{ width: '100%', height: '100%', borderRadius: 8, overflow: 'hidden', background: '#0d0f14', boxShadow: '0 8px 32px rgba(255,122,24,0.5)' }}>
+              {card?.image && <img src={`/${card.image}`} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top center', display: 'block' }} />}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Promotion picker — shown when human player's active slot is empty and needs a replacement */}
+      {(() => {
+        const pending = state.pendingPromotions[0];
+        if (!pending) return null;
+        if (pending.side !== perspectiveId) return null;
+        const benchFighters = myPlayer.bench
+          .map((f, i) => (f ? { f, i } : null))
+          .filter(Boolean) as { f: NonNullable<typeof myPlayer.bench[0]>; i: number }[];
+        if (benchFighters.length === 0) return null;
+
+        return (
+          <div style={{
+            position: 'absolute', inset: 0, background: 'rgba(13,15,20,0.88)',
+            display: 'flex', alignItems: 'flex-end', zIndex: 390,
+          }}>
+            <div style={{
+              width: '100%', background: 'var(--bg)',
+              borderRadius: '16px 16px 0 0', padding: '20px 16px 32px',
+              display: 'flex', flexDirection: 'column', gap: 14,
+            }}>
+              <p style={{
+                fontFamily: 'Bangers, sans-serif', fontSize: 15, color: 'var(--ki)',
+                margin: 0, letterSpacing: 1.5, textTransform: 'uppercase', textAlign: 'center',
+              }}>
+                CHOOSE REPLACEMENT
+              </p>
+              <p style={{
+                fontFamily: 'Saira Condensed, sans-serif', fontSize: 10, color: 'var(--muted)',
+                margin: 0, letterSpacing: 1, textTransform: 'uppercase', textAlign: 'center',
+              }}>
+                Select a bench fighter to take the active slot
+              </p>
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+                {benchFighters.map(({ f, i }) => {
+                  let card: ReturnType<typeof getCard> | null = null;
+                  try { card = getCard(f.cardId); } catch { card = null; }
+                  const hpPct = Math.round((f.currentHp / f.maxHp) * 100);
+                  const hpColor = hpPct > 55 ? '#34c759' : hpPct > 25 ? '#ffb648' : '#ff4d4d';
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => {
+                        startPromoteAnim(i, pending.activeIndex, f.cardId, () => {
+                          safeIntent({ type: 'promote_from_bench', benchIndex: i });
+                        });
+                      }}
+                      style={{
+                        background: 'rgba(255,255,255,0.04)', border: '1.5px solid rgba(255,255,255,0.12)',
+                        borderRadius: 10, padding: '8px 10px', cursor: 'pointer',
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+                        minWidth: 90,
+                      }}
+                    >
+                      <div style={{ width: 70, height: 98, borderRadius: 6, overflow: 'hidden', background: '#0d0f14' }}>
+                        {card?.image && <img src={`/${card.image}`} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top center', display: 'block' }} />}
+                      </div>
+                      <span style={{ fontFamily: 'Saira Condensed, sans-serif', fontSize: 10, color: 'var(--ink)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                        {card?.name ?? f.cardId}
+                      </span>
+                      <span style={{ fontFamily: 'Saira Condensed, sans-serif', fontSize: 9, color: hpColor }}>
+                        {f.currentHp.toLocaleString()} HP
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
         );
       })()}
 

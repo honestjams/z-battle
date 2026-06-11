@@ -126,7 +126,18 @@ export default function Home() {
   const handleIntent = useCallback((intent: Intent) => {
     if (!gameState) return;
     const prevTurnPlayer = gameState.turnPlayer;
-    const newState = applyIntent(gameState, intent);
+    let newState = applyIntent(gameState, intent);
+
+    // Auto-resolve any pending promotions for the AI so they never show a picker
+    if (aiPlayer) {
+      while (newState.pendingPromotions.length > 0 && newState.pendingPromotions[0].side === aiPlayer) {
+        const bench = newState.players[aiPlayer].bench;
+        const benchIdx = bench.findIndex(f => f !== null);
+        if (benchIdx === -1) break;
+        newState = applyIntent(newState, { type: 'promote_from_bench', benchIndex: benchIdx });
+      }
+    }
+
     setGameState(newState);
 
     if (newState.winner) {
@@ -149,6 +160,7 @@ export default function Home() {
     if (gameState.turnPlayer !== aiPlayer) return;
     if (gameState.winner) return;
     if (pendingAiAttack || pendingAiPlay) return;
+    if (gameState.pendingPromotions.length > 0) return; // wait for human to choose their replacement
     const timer = setTimeout(() => {
       const move = chooseMove(gameState, aiPlayer);
       if (move) {

@@ -111,6 +111,7 @@ export function createInitialState(
     winner: null,
     log: [],
     firstAttackDone: false,
+    pendingPromotions: [],
   };
 }
 

@@ -42,6 +42,12 @@ export interface LogEntry {
   text: string;
 }
 
+export interface PendingPromotion {
+  side: PlayerId;
+  activeIndex: number;
+  friezaWrathPending: boolean;
+}
+
 export interface GameState {
   phase: Phase;
   turnPlayer: PlayerId;
@@ -53,6 +59,7 @@ export interface GameState {
   winner: PlayerId | null;
   log: LogEntry[];
   firstAttackDone: boolean;
+  pendingPromotions: PendingPromotion[];
 }
 
 // ---- Card definitions (mirror cards.json shape) ----
@@ -91,5 +98,6 @@ export type Intent =
   | { type: 'attack'; attackerIndex: number; targetIndex: number; useKaioken?: boolean; useOneShotAbility?: boolean; useTriBeam?: boolean }
   | { type: 'ultimate'; fighterIndex: number; targetIndex?: number }
   | { type: 'sacrifice'; side: SlotType; index: number }
+  | { type: 'promote_from_bench'; benchIndex: number }
   | { type: 'advance_phase' }
   | { type: 'end_turn' };
