@@ -1969,11 +1969,20 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
         >
           {(() => {
             const CARD_W = 86;
-            // Preserve original indices, then hide the card being actively dragged
+            // Preserve original indices, then hide the card being actively dragged or mid-play-animation
             const allWithIdx = handToShow.map((cid, idx) => ({ cardId: cid, origIdx: idx }));
-            const displayHand = (drag?.active && drag.handIdx != null)
-              ? allWithIdx.filter(({ origIdx }) => origIdx !== drag.handIdx)
-              : allWithIdx;
+            let displayHand = allWithIdx;
+            if (drag?.active && drag.handIdx != null) {
+              displayHand = displayHand.filter(({ origIdx }) => origIdx !== drag.handIdx);
+            }
+            if (itemPlayAnim?.cardId) {
+              // Hide one instance of the animating card so it doesn't flash back into the hand
+              let dropped = false;
+              displayHand = displayHand.filter(({ cardId }) => {
+                if (!dropped && cardId === itemPlayAnim.cardId) { dropped = true; return false; }
+                return true;
+              });
+            }
             const handCount = displayHand.length;
             const fanCenter = (handCount - 1) / 2;
             const fanAngleStep = Math.min(7, 28 / Math.max(handCount - 1, 1));

@@ -327,21 +327,21 @@ export default function FighterSlot({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '0 4px 3px',
+            padding: '1px 5px 4px',
             transform: 'none',
             position: 'relative',
             zIndex: 2,
           }}>
-            <span style={{ fontFamily: 'Saira Condensed, sans-serif', fontSize: 7, color: 'var(--hp)', lineHeight: 1.1 }}>
+            <span style={{ fontFamily: 'Saira Condensed, sans-serif', fontSize: 10, color: 'var(--hp)', lineHeight: 1.1 }}>
               {formatStat(fighter.currentHp)}<br/>
-              <span style={{ color: 'var(--muted)', fontSize: 6 }}>/{formatStat(fighter.maxHp)}</span>
+              <span style={{ color: 'var(--muted)', fontSize: 8 }}>/{formatStat(fighter.maxHp)}</span>
             </span>
             <div key={displayAtk} className="power-level-flash">
-              <span style={{ fontFamily: 'Bangers, sans-serif', fontSize: 11, color: atkColor, letterSpacing: 0.5 }}>
+              <span style={{ fontFamily: 'Bangers, sans-serif', fontSize: 15, color: atkColor, letterSpacing: 0.5 }}>
                 {formatStat(displayAtk)}
               </span>
             </div>
-            <span style={{ fontFamily: 'Bangers, sans-serif', fontSize: 11, color: defColor, letterSpacing: 0.5 }}>
+            <span style={{ fontFamily: 'Bangers, sans-serif', fontSize: 15, color: defColor, letterSpacing: 0.5 }}>
               {formatStat(displayDef)}
             </span>
           </div>
