@@ -8,7 +8,6 @@ import { getEffectiveStats } from '@/lib/engine/buffs';
 import FighterSlot from './FighterSlot';
 import KiDisplay from './KiDisplay';
 import KoScore from './KoScore';
-import PhaseIndicator from './PhaseIndicator';
 import FieldSlot from './FieldSlot';
 import PileDisplay from './PileDisplay';
 import HandCard from './HandCard';
@@ -1683,10 +1682,87 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
       )}
 
       {/* Battle zone */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 0, flex: 1, overflow: 'hidden', minHeight: 0 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 0, flex: 1, overflow: 'hidden', minHeight: 0, position: 'relative' }}>
+
+        {/* Beam clash — sits across full battle zone width */}
+        {beamClash && (
+          <div className="beam-clash" style={{ position: 'absolute', inset: 0, zIndex: 50, pointerEvents: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: '100%', height: 3, background: 'linear-gradient(90deg, transparent, #ff7a18, white, #ff7a18, transparent)', boxShadow: '0 0 20px #ff7a18, 0 0 40px rgba(255,122,24,0.5)' }} />
+          </div>
+        )}
+
+        {/* Field card — floats on the far left, overlapping both active rows */}
+        <div style={{
+          position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)',
+          zIndex: 15, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+        }}>
+          <div
+            data-slot="field"
+            style={{
+              background: 'rgba(255,255,255,0.05)',
+              borderRadius: 8, padding: 3,
+              border: '1px solid rgba(255,255,255,0.1)',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.6)',
+            }}
+          >
+            <FieldSlot
+              fieldId={state.field}
+              isValidPlaySlot={
+                selection.mode === 'hand_card_selected' &&
+                moves.some(m => m.type === 'play_field' && m.cardId === selection.cardId)
+              }
+              onTap={state.field
+                ? () => setZoomedCard({ cardId: state.field! })
+                : handleFieldSlotTap}
+            />
+          </div>
+          {state.discard.length > 0 && (
+            <span style={{ fontFamily: 'Saira Condensed, sans-serif', fontSize: 7, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+              ×{state.discard.length}
+            </span>
+          )}
+        </div>
+
+        {/* Phase button — floats on the far right, mirroring the field card */}
+        <div style={{
+          position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+          zIndex: 15, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          {isMyTurn ? (
+            <button
+              onClick={(e) => { e.stopPropagation(); handlePhaseButton(); }}
+              onPointerDown={() => setPhaseButtonPressed(true)}
+              onPointerUp={() => setPhaseButtonPressed(false)}
+              onPointerCancel={() => setPhaseButtonPressed(false)}
+              style={{
+                fontFamily: 'Bangers, sans-serif', fontSize: 11, letterSpacing: 1.5,
+                color: '#0d0f14',
+                background: 'linear-gradient(135deg, var(--ki), var(--ki2))',
+                border: 'none', borderRadius: 16, padding: '10px 12px',
+                cursor: 'pointer', boxShadow: '0 3px 14px rgba(255,122,24,0.55)',
+                textTransform: 'uppercase', whiteSpace: 'nowrap',
+                WebkitTapHighlightColor: 'transparent',
+                writingMode: 'vertical-rl' as React.CSSProperties['writingMode'],
+                textOrientation: 'mixed' as React.CSSProperties['textOrientation'],
+                opacity: phaseButtonPressed ? 0.75 : 1,
+                transform: phaseButtonPressed ? 'scale(0.96)' : 'scale(1)',
+                transition: 'opacity 0.1s, transform 0.1s',
+              }}
+            >
+              {getPhaseButtonLabel()}
+            </button>
+          ) : perspective && !isMyTurn ? (
+            <span style={{
+              fontFamily: 'Bangers, sans-serif', fontSize: 8, color: 'var(--muted)',
+              letterSpacing: 1, textTransform: 'uppercase', textAlign: 'center',
+              writingMode: 'vertical-rl' as React.CSSProperties['writingMode'],
+              opacity: 0.5,
+            }}>OPP TURN</span>
+          ) : null}
+        </div>
 
         {/* Opponent zone — bench at top, actives closest to centre */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '6px 12px 4px', background: 'transparent', flexShrink: 0, opacity: isMyTurn ? 0.9 : 1, transition: 'opacity 0.3s' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '6px 12px 4px', background: 'transparent', flexShrink: 0, opacity: isMyTurn ? 0.9 : 1, transition: 'opacity 0.3s', transform: 'perspective(500px) rotateX(5deg) scale(0.95)', transformOrigin: 'center bottom' }}>
           {/* Opp bench row: KO pips float on the right */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%' }}>
             <div style={{ flex: 1 }} />
@@ -1718,7 +1794,7 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
               <KoScore scored={state.players[perspectiveId].koScoredAgainst} />
             </div>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 4 }}>
             {oppPlayer.actives.map((f, i) => {
               const isTarget = validAttackTargets.has(i) || chiaotzuStunTargets.has(i) || ultTargets.has(i) || sdEnemyTargets.has(i);
               const isOppPlay = validPlaySlots.has(`active-${i}-opp`);
@@ -1745,91 +1821,11 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
           </div>
         </div>
 
-        {/* Center strip */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '6px 12px',
-          background: 'rgba(22,26,34,0.82)',
-          borderTop: '1px solid var(--line)',
-          borderBottom: '1px solid var(--line)',
-          minHeight: 64,
-          flex: 1,
-          position: 'relative',
-        }}>
-          {beamClash && (
-            <div className="beam-clash" style={{ position: 'absolute', inset: 0, zIndex: 50, pointerEvents: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <div style={{ width: '100%', height: 3, background: 'linear-gradient(90deg, transparent, #ff7a18, white, #ff7a18, transparent)', boxShadow: '0 0 20px #ff7a18, 0 0 40px rgba(255,122,24,0.5)' }} />
-            </div>
-          )}
-          <PileDisplay piles={myPlayer.piles} />
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-            <div
-              data-slot="field"
-              style={{
-                background: 'rgba(255,255,255,0.04)',
-                borderRadius: 10,
-                padding: 4,
-                border: '1px solid rgba(255,255,255,0.08)',
-              }}
-            >
-              <FieldSlot
-                fieldId={state.field}
-                isValidPlaySlot={
-                  selection.mode === 'hand_card_selected' &&
-                  moves.some(m => m.type === 'play_field' && m.cardId === selection.cardId)
-                }
-                onTap={state.field
-                  ? () => setZoomedCard({ cardId: state.field! })
-                  : handleFieldSlotTap}
-              />
-            </div>
-            {state.discard.length > 0 && (
-              <span style={{ fontFamily: 'Saira Condensed, sans-serif', fontSize: 8, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                Discard: {state.discard.length}
-              </span>
-            )}
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-            <div style={{
-              fontFamily: 'Bangers, sans-serif',
-              fontSize: 9,
-              letterSpacing: 2,
-              textTransform: 'uppercase',
-              color: isMyTurn ? 'var(--ki)' : 'var(--muted)',
-              background: isMyTurn ? 'rgba(255,122,24,0.14)' : 'rgba(255,255,255,0.06)',
-              border: `1px solid ${isMyTurn ? 'rgba(255,122,24,0.35)' : 'rgba(255,255,255,0.1)'}`,
-              borderRadius: 20,
-              padding: '3px 10px',
-              transition: 'all 0.3s',
-            }}>
-              {state.phase === 'draw' ? 'DRAW' :
-               state.phase === 'main1' ? 'MAIN 1' :
-               state.phase === 'battle' ? 'BATTLE' :
-               state.phase === 'main2' ? 'MAIN 2' : 'END'}
-            </div>
-            <PhaseIndicator phase={state.phase} turnNumber={state.turnNumber} />
-            {(() => {
-              const tn = state.turnNumber;
-              const saga = tn <= 4 ? 'SAIYAN SAGA' : tn <= 8 ? 'NAMEK SAGA' : tn <= 12 ? 'FRIEZA SAGA' : tn <= 16 ? 'CELL SAGA' : 'BUU SAGA';
-              const sagaColor = tn <= 4 ? '#ff7a18' : tn <= 8 ? '#34c759' : tn <= 12 ? '#ff4d4d' : tn <= 16 ? '#3aa6ff' : '#b44dff';
-              return (
-                <div style={{
-                  fontFamily: 'Saira Condensed, sans-serif', fontSize: 8,
-                  color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 1,
-                  borderLeft: `2px solid ${sagaColor}`, paddingLeft: 4,
-                  marginTop: 2,
-                }}>
-                  {saga}
-                </div>
-              );
-            })()}
-          </div>
-        </div>
+        {/* Spacer to fill center vertical space */}
+        <div style={{ flex: 1 }} />
 
         {/* Player actives */}
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 8, padding: '4px 12px 6px', background: 'transparent', flexShrink: 0 }}>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 4, padding: '4px 12px 6px', background: 'transparent', flexShrink: 0 }}>
           {myPlayer.actives.map((f, i) => {
             const isAttackerSelected = selection.mode === 'attacker_selected' && selection.attackerIdx === i;
             const isPlayable = validPlaySlots.has(`active-${i}-own`);
@@ -1900,49 +1896,9 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
             </div>
           </div>
 
-          {/* Right: phase button or waiting indicator — same fixed width as left flank */}
+          {/* Right: pile display — same fixed width as left flank */}
           <div style={{ width: 90, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
-            {isMyTurn ? (
-              <button
-                onClick={(e) => { e.stopPropagation(); handlePhaseButton(); }}
-                onPointerDown={() => setPhaseButtonPressed(true)}
-                onPointerUp={() => setPhaseButtonPressed(false)}
-                onPointerCancel={() => setPhaseButtonPressed(false)}
-                style={{
-                  fontFamily: 'Bangers, sans-serif',
-                  fontSize: 12,
-                  letterSpacing: 1.5,
-                  color: '#0d0f14',
-                  background: 'linear-gradient(135deg, var(--ki), var(--ki2))',
-                  border: 'none',
-                  borderRadius: 20,
-                  padding: '12px 18px',
-                  cursor: 'pointer',
-                  boxShadow: '0 3px 12px rgba(255,122,24,0.5)',
-                  textTransform: 'uppercase',
-                  whiteSpace: 'nowrap',
-                  WebkitTapHighlightColor: 'transparent',
-                  opacity: phaseButtonPressed ? 0.75 : 1,
-                  transform: phaseButtonPressed ? 'scale(0.96)' : 'scale(1)',
-                  transition: 'opacity 0.1s, transform 0.1s',
-                }}
-              >
-                {getPhaseButtonLabel()}
-              </button>
-            ) : perspective && !isMyTurn ? (
-              <span style={{
-                fontFamily: 'Bangers, sans-serif',
-                fontSize: 9,
-                color: 'var(--muted)',
-                letterSpacing: 1,
-                textTransform: 'uppercase',
-                textAlign: 'center',
-                maxWidth: 48,
-                lineHeight: 1.2,
-              }}>
-                OPP TURN
-              </span>
-            ) : null}
+            <PileDisplay piles={myPlayer.piles} />
           </div>
         </div>
       </div>
@@ -1950,10 +1906,11 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
 
       {/* Player hand */}
       <div style={{
-        background: 'rgba(13,15,20,0.96)',
-        borderTop: '1px solid var(--line)',
+        background: 'transparent',
         flexShrink: 0,
         paddingBottom: 'max(8px, env(safe-area-inset-bottom))',
+        position: 'relative',
+        zIndex: 10,
       }}>
         {/* Draw pile buttons */}
         {state.phase === 'draw' && !isFirstPlayerTurn1 && isMyTurn && (
