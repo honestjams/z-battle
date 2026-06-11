@@ -16,11 +16,12 @@ import GameBoard from '@/components/game/GameBoard';
 import SetupScreen, { type GameMode } from '@/components/game/SetupScreen';
 import PassScreen from '@/components/game/PassScreen';
 import WinScreen from '@/components/game/WinScreen';
+import PowerLevelScreen from '@/components/game/PowerLevelScreen';
 
 type Screen =
   | 'loading' | 'auth' | 'lobby' | 'friends'
   | 'waiting_room' | 'online_game'
-  | 'setup' | 'pass' | 'game' | 'win';
+  | 'setup' | 'pass' | 'game' | 'win' | 'power_level';
 
 const AI_PLAYER: PlayerId = 'p2';
 
@@ -41,6 +42,7 @@ export default function Home() {
 
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [aiPlayer, setAiPlayer] = useState<PlayerId | null>(null);
+  const [currentGameMode, setCurrentGameMode] = useState<GameMode>('hotseat');
   const [winnerState, setWinnerState] = useState<{ winner: PlayerId; deck: string } | null>(null);
   const [pendingAiAttack, setPendingAiAttack] = useState<Intent | null>(null);
   const [pendingAiPlay, setPendingAiPlay] = useState<Intent | null>(null);
@@ -142,6 +144,16 @@ export default function Home() {
 
     if (newState.winner) {
       setWinnerState({ winner: newState.winner, deck: newState.players[newState.winner].deck });
+      // Record result: for AI and hotseat, human is always p1
+      if (user) {
+        const mode = aiPlayer ? 'ai' : 'hotseat';
+        supabase.from('game_results').insert({
+          user_id: user.id,
+          game_mode: mode,
+          deck: newState.players['p1'].deck,
+          won: newState.winner === 'p1',
+        }).then(() => {});
+      }
       setScreen('win');
       return;
     }
@@ -179,6 +191,7 @@ export default function Home() {
   function handleSetupStart(p1Deck: string, p2Deck: string, firstPlayer: PlayerId, mode: GameMode) {
     const state = createInitialState(p1Deck, p2Deck, firstPlayer);
     setGameState(state);
+    setCurrentGameMode(mode);
     const ai = mode === 'vs_ai' ? AI_PLAYER : null;
     setAiPlayer(ai);
     setScreen(ai ? 'game' : 'pass');
@@ -234,8 +247,13 @@ export default function Home() {
           onJoinMatch={(id, role) => { setActiveMatchId(id); setMyOnlineRole(role); setScreen('online_game'); }}
           onPlayOffline={() => setScreen('setup')}
           onOpenFriends={() => setScreen('friends')}
+          onPowerLevel={() => setScreen('power_level')}
           onSignOut={() => supabase.auth.signOut()}
         />
+      )}
+
+      {screen === 'power_level' && user && (
+        <PowerLevelScreen user={user} onBack={() => setScreen('lobby')} />
       )}
 
       {screen === 'friends' && user && (
@@ -260,7 +278,19 @@ export default function Home() {
           matchId={activeMatchId}
           myRole={myOnlineRole}
           user={user}
-          onGameEnd={(winner, deck) => { setWinnerState({ winner, deck }); setActiveMatchId(null); setScreen('win'); }}
+          onGameEnd={(winner, deck, myDeck) => {
+            setWinnerState({ winner, deck });
+            setActiveMatchId(null);
+            if (user && myOnlineRole) {
+              supabase.from('game_results').insert({
+                user_id: user.id,
+                game_mode: 'online',
+                deck: myDeck,
+                won: winner === myOnlineRole,
+              }).then(() => {});
+            }
+            setScreen('win');
+          }}
           onLeave={() => { setActiveMatchId(null); setScreen('lobby'); }}
         />
       )}

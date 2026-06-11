@@ -12,7 +12,7 @@ interface OnlineGameScreenProps {
   matchId: string;
   myRole: PlayerId;
   user: User;
-  onGameEnd: (winner: PlayerId, winnerDeck: string) => void;
+  onGameEnd: (winner: PlayerId, winnerDeck: string, myDeck: string) => void;
   onLeave: () => void;
 }
 
@@ -44,7 +44,7 @@ export default function OnlineGameScreen({ matchId, myRole, user, onGameEnd, onL
           const incoming = match.state as GameState;
           setGameState(incoming);
           if (incoming.winner) {
-            onGameEnd(incoming.winner, incoming.players[incoming.winner].deck);
+            onGameEnd(incoming.winner, incoming.players[incoming.winner].deck, incoming.players[myRole].deck);
           }
         }
       })
@@ -72,7 +72,7 @@ export default function OnlineGameScreen({ matchId, myRole, user, onGameEnd, onL
     }).eq('id', matchId);
 
     if (newState.winner) {
-      onGameEnd(newState.winner, newState.players[newState.winner].deck);
+      onGameEnd(newState.winner, newState.players[newState.winner].deck, newState.players[myRole].deck);
     }
   }, [gameState, matchData, matchId, myRole, onGameEnd]);
 

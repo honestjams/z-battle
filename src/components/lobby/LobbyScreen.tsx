@@ -20,10 +20,11 @@ interface LobbyScreenProps {
   onJoinMatch: (matchId: string, myRole: PlayerId) => void;
   onPlayOffline: () => void;
   onOpenFriends: () => void;
+  onPowerLevel: () => void;
   onSignOut: () => void;
 }
 
-export default function LobbyScreen({ user, onCreateMatch, onJoinMatch, onPlayOffline, onOpenFriends, onSignOut }: LobbyScreenProps) {
+export default function LobbyScreen({ user, onCreateMatch, onJoinMatch, onPlayOffline, onOpenFriends, onPowerLevel, onSignOut }: LobbyScreenProps) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [openMatches, setOpenMatches] = useState<Match[]>([]);
   const [myMatches, setMyMatches] = useState<Match[]>([]);
@@ -148,6 +149,14 @@ export default function LobbyScreen({ user, onCreateMatch, onJoinMatch, onPlayOf
           letterSpacing: 1, textTransform: 'uppercase',
         }}>
           FRIENDS
+        </button>
+        <button onClick={onPowerLevel} style={{
+          flex: 1, background: 'rgba(255,255,255,0.04)', border: '1.5px solid rgba(255,255,255,0.1)',
+          borderRadius: 12, padding: '14px', cursor: 'pointer',
+          fontFamily: 'Bangers, sans-serif', fontSize: 13, color: 'var(--muted)',
+          letterSpacing: 1, textTransform: 'uppercase',
+        }}>
+          POWER LEVEL
         </button>
       </div>
 

@@ -27,3 +27,12 @@ export interface Friendship {
   status: 'pending' | 'accepted' | 'blocked';
   created_at: string;
 }
+
+export interface GameResult {
+  id: string;
+  user_id: string;
+  game_mode: 'ai' | 'hotseat' | 'online';
+  deck: string;
+  won: boolean;
+  created_at: string;
+}
