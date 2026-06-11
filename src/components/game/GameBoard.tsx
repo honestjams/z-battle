@@ -2065,16 +2065,7 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
                 onPointerMove={(e) => {
                   const d = dragRef.current;
                   if (!d || d.handIdx !== i) return;
-                  const dx = e.clientX - d.startX;
-                  const dy = e.clientY - d.startY;
-                  const dist = Math.hypot(dx, dy);
-                  if (!d.active && dist >= 8 && Math.abs(dx) > Math.abs(dy)) {
-                    e.currentTarget.releasePointerCapture(e.pointerId);
-                    dragRef.current = null;
-                    setDrag(null);
-                    setSelection({ mode: 'idle' });
-                    return;
-                  }
+                  const dist = Math.hypot(e.clientX - d.startX, e.clientY - d.startY);
                   const active = d.active || dist >= 8;
                   const updated = { ...d, x: e.clientX, y: e.clientY, active };
                   dragRef.current = updated;
@@ -2103,7 +2094,7 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
                 style={{
                   opacity: 1,
                   flexShrink: 0,
-                  touchAction: canDrag ? 'pan-y' : 'auto',
+                  touchAction: canDrag ? 'none' : 'auto',
                   cursor: canDrag ? 'grab' : 'pointer',
                   WebkitTapHighlightColor: 'rgba(255,255,255,0.08)',
                   transform: `rotate(${(i - fanCenter) * fanAngleStep}deg) translateY(${Math.pow(i - fanCenter, 2) * 2.5 - (isHandSelected ? 38 : 0)}px) scale(${isHandSelected ? 1.06 : 1})`,
