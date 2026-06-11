@@ -236,6 +236,8 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
   const fieldLeaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [narration, setNarration] = useState<string | null>(null);
   const [handExpanded, setHandExpanded] = useState(false);
+  const handContainerRef = useRef<HTMLDivElement>(null);
+  const [handContainerW, setHandContainerW] = useState(390);
   const prevStateSnap = useRef<{
     hp: Record<string, number>;
     occupied: Record<string, boolean>;
@@ -265,6 +267,17 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
     fieldLeaveTimerRef.current = setTimeout(() => setLeavingFieldImage(null), 700);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.field]);
+
+  // Track hand container width for dynamic card overlap
+  useEffect(() => {
+    const el = handContainerRef.current;
+    if (!el) return;
+    const update = () => setHandContainerW(el.clientWidth);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // Compact mode for narrow screens
   useEffect(() => {
@@ -1997,6 +2010,7 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
         </div>
         {/* Scrollable card row */}
         <div
+          ref={handContainerRef}
           className="hand-drawer"
           style={{ maxHeight: handExpanded ? 'min(160px, 22dvh)' : 'max(96px, 12dvh)' }}
         >
@@ -2004,20 +2018,28 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
           className="hand-scroll"
           style={{
             display: 'flex',
-            overflowX: 'auto',
+            justifyContent: 'center',
+            overflowX: 'hidden',
             overflowY: 'visible',
-            WebkitOverflowScrolling: 'touch' as React.CSSProperties['WebkitOverflowScrolling'],
             padding: '4px 16px 8px',
             msOverflowStyle: 'none' as React.CSSProperties['msOverflowStyle'],
             scrollbarWidth: 'none' as React.CSSProperties['scrollbarWidth'],
-            touchAction: 'pan-x',
             alignItems: 'flex-end',
           }}
         >
           {(() => {
+            const CARD_W = 86;
             const handCount = handToShow.length;
             const fanCenter = (handCount - 1) / 2;
             const fanAngleStep = Math.min(7, 28 / Math.max(handCount - 1, 1));
+            // Compute the minimum overlap so the full hand fits without scrolling.
+            // 32px accounts for the 16px padding on each side.
+            const usable = handContainerW - 32;
+            const rawOverlap = handCount > 1
+              ? (CARD_W * handCount - usable) / (handCount - 1)
+              : 0;
+            // clamp: never less than 26 (existing look), never more than 62 (keep cards readable)
+            const overlap = Math.max(26, Math.min(Math.ceil(rawOverlap), 62));
             return handToShow.map((cardId, i) => {
             const isHandSelected = selection.mode === 'hand_card_selected' && selection.cardId === cardId;
             const isPlayable = playableCards.has(cardId);
@@ -2047,7 +2069,6 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
                   const dy = e.clientY - d.startY;
                   const dist = Math.hypot(dx, dy);
                   if (!d.active && dist >= 8 && Math.abs(dx) > Math.abs(dy)) {
-                    // Primarily horizontal — cancel drag, release for hand scroll
                     e.currentTarget.releasePointerCapture(e.pointerId);
                     dragRef.current = null;
                     setDrag(null);
@@ -2062,18 +2083,15 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
                 onPointerUp={(e) => {
                   const d = dragRef.current;
                   if (!d || d.handIdx !== i) {
-                    // No drag in flight for this card — treat as tap
                     setZoomedCard({ cardId, handIdx: i });
                     return;
                   }
                   if (!d.active) {
-                    // Pointer released before threshold — tap
                     dragRef.current = null;
                     setDrag(null);
                     setSelection({ mode: 'idle' });
                     setZoomedCard({ cardId, handIdx: i });
                   }
-                  // Active drag drop is handled by the global window pointerup listener
                 }}
                 onPointerCancel={() => {
                   if (dragRef.current?.handIdx === i) {
@@ -2091,8 +2109,8 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
                   transform: `rotate(${(i - fanCenter) * fanAngleStep}deg) translateY(${Math.pow(i - fanCenter, 2) * 2.5 - (isHandSelected ? 38 : 0)}px) scale(${isHandSelected ? 1.06 : 1})`,
                   transformOrigin: 'center bottom',
                   zIndex: isHandSelected ? handCount + 5 : i,
-                  transition: 'transform 0.15s ease',
-                  marginLeft: i > 0 ? -26 : 0,
+                  transition: 'transform 0.15s ease, margin-left 0.2s ease',
+                  marginLeft: i > 0 ? -overlap : 0,
                 }}
               >
                 <HandCard cardId={cardId} isSelected={isHandSelected || (drag?.active === true && drag.cardId === cardId)} />
