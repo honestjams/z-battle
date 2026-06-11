@@ -1,0 +1,584 @@
+import { applyIntent, checkWinLoss } from '../engine';
+import { makeFighterInstance } from '../setup';
+import { getEffectiveStats } from '../buffs';
+import { GameState, PlayerState, FighterInstance } from '../types';
+
+// ---- Helper to build a minimal deterministic GameState ----
+function makeEmptyPlayer(deckId: string): PlayerState {
+  return {
+    deck: deckId,
+    kiMax: 1,
+    kiCurrent: 1,
+    koScoredAgainst: 0,
+    hand: [],
+    piles: { hero: [], item: [], field: [] },
+    actives: [null, null],
+    bench: [null, null],
+    retreatUsedThisTurn: false,
+    turnNumber: 1,
+    friendlySaiyanKoedThisGame: false,
+  };
+}
+
+function makeState(overrides?: Partial<GameState>): GameState {
+  const base: GameState = {
+    phase: 'main1',
+    turnPlayer: 'p1',
+    turnNumber: 1,
+    firstPlayer: 'p1',
+    field: null,
+    discard: [],
+    players: {
+      p1: makeEmptyPlayer('saiyan'),
+      p2: makeEmptyPlayer('namekian'),
+    },
+    winner: null,
+    log: [],
+  };
+  return { ...base, ...overrides };
+}
+
+// ---- Test 1: Ki curve ----
+describe('Ki curve', () => {
+  it('Turn 1 P1 starts with 1 Ki', () => {
+    const s = makeState({ phase: 'draw' });
+    // Give p1 a card to draw so we can skip past draw phase
+    const s1 = { ...s, players: { ...s.players, p1: { ...s.players.p1, piles: { ...s.players.p1.piles, hero: ['saiyan_recruit'] } } } };
+    const s2 = applyIntent(s1, { type: 'draw', pile: 'hero' });
+    expect(s2.players.p1.kiCurrent).toBe(1);
+    expect(s2.players.p1.kiMax).toBe(1);
+  });
+
+  it('After first end_turn, p2 gets turn with 1 Ki', () => {
+    // P1 turn number = 1, P2 hasn't had a turn yet (turnNumber 0 -> 1 after first turn switch)
+    let s = makeState({ phase: 'end' });
+    // p2 starts with turnNumber 0 (not yet had a turn)
+    s = { ...s, players: { ...s.players, p2: { ...s.players.p2, turnNumber: 0 } } };
+    s = applyIntent(s, { type: 'advance_phase' }); // EOT + switch to p2
+    expect(s.turnPlayer).toBe('p2');
+    expect(s.players.p2.kiMax).toBe(1);
+    expect(s.players.p2.kiCurrent).toBe(1);
+  });
+
+  it('P1 Turn 2 gets 2 Ki', () => {
+    let s = makeState({ phase: 'end' });
+    // p2 starts with turnNumber 0 (not yet had a turn)
+    s = { ...s, players: { ...s.players, p2: { ...s.players.p2, turnNumber: 0 } } };
+    // End p1 turn 1 -> p2 turn 1
+    s = applyIntent(s, { type: 'advance_phase' });
+    expect(s.turnPlayer).toBe('p2');
+    // End p2 turn 1 -> p1 turn 2
+    s = { ...s, phase: 'end' };
+    s = applyIntent(s, { type: 'advance_phase' });
+    expect(s.turnPlayer).toBe('p1');
+    expect(s.players.p1.kiMax).toBe(2);
+    expect(s.players.p1.kiCurrent).toBe(2);
+  });
+
+  it('Ki caps at 8', () => {
+    // Simulate many turns
+    let s = makeState({ phase: 'end' });
+    for (let i = 0; i < 20; i++) {
+      s = applyIntent(s, { type: 'advance_phase' });
+      s = { ...s, phase: 'end' };
+    }
+    // Both players should be at 8 Ki max
+    expect(s.players.p1.kiMax).toBeLessThanOrEqual(8);
+    expect(s.players.p2.kiMax).toBeLessThanOrEqual(8);
+  });
+});
+
+// ---- Test 2: KO scoring ----
+describe('KO scoring', () => {
+  it('Defeating a fighter increments koScoredAgainst on the KO\'d player', () => {
+    let s = makeState({ phase: 'battle' });
+    // P1 has a strong fighter, P2 has a weak fighter
+    const p1Fighter = makeFighterInstance('saiyan_brawler'); // 3000 ATK, 0 DEF
+    const p2Fighter = makeFighterInstance('namekian_child'); // 2500 ATK, 1000 DEF, 2500 HP
+
+    s.players.p1.actives[0] = { ...p1Fighter, summoningSick: false };
+    s.players.p1.kiCurrent = 5;
+    s.players.p2.actives[0] = p2Fighter;
+
+    // ATK 3000 vs DEF 1000 = 2000 damage. namekian_child has 2500 HP. Won't KO.
+    // Let's reduce p2 fighter HP to be KO-able
+    s.players.p2.actives[0] = { ...p2Fighter, currentHp: 1000 };
+
+    s = applyIntent(s, { type: 'attack', attackerIndex: 0, targetIndex: 0 });
+
+    // p2 fighter was KO'd -> p2's koScoredAgainst goes up by 1
+    expect(s.players.p2.koScoredAgainst).toBe(1);
+  });
+
+  it('Reaching 3 KOs triggers a winner', () => {
+    let s = makeState({ phase: 'battle' });
+    s.players.p2.koScoredAgainst = 2;
+
+    const p1Fighter = makeFighterInstance('saiyan_brawler');
+    const p2Fighter = makeFighterInstance('namekian_child');
+
+    s.players.p1.actives[0] = { ...p1Fighter, summoningSick: false };
+    s.players.p1.kiCurrent = 5;
+    s.players.p2.actives[0] = { ...p2Fighter, currentHp: 500 };
+
+    s = applyIntent(s, { type: 'attack', attackerIndex: 0, targetIndex: 0 });
+
+    expect(s.players.p2.koScoredAgainst).toBe(3);
+    expect(s.winner).toBe('p1');
+  });
+});
+
+// ---- Test 3: Promotion from bench ----
+describe('Promotion from bench', () => {
+  it('When active slot is KO\'d, bench fighter promotes to fill it', () => {
+    let s = makeState({ phase: 'battle' });
+
+    const p1Fighter = makeFighterInstance('saiyan_brawler');
+    const p2ActiveFighter = makeFighterInstance('namekian_child');
+    const p2BenchFighter = makeFighterInstance('dragon_clan_namekian');
+
+    s.players.p1.actives[0] = { ...p1Fighter, summoningSick: false };
+    s.players.p1.kiCurrent = 5;
+    s.players.p2.actives[0] = { ...p2ActiveFighter, currentHp: 500 };
+    s.players.p2.bench[0] = p2BenchFighter;
+
+    s = applyIntent(s, { type: 'attack', attackerIndex: 0, targetIndex: 0 });
+
+    // p2 active slot 0 should now have the bench fighter
+    expect(s.players.p2.actives[0]?.cardId).toBe('dragon_clan_namekian');
+    expect(s.players.p2.bench[0]).toBeNull();
+  });
+
+  it('When active has two slots and only one is KO\'d, other active remains', () => {
+    let s = makeState({ phase: 'battle' });
+
+    const p1Fighter = makeFighterInstance('saiyan_brawler');
+    const p2Active0 = makeFighterInstance('namekian_child');
+    const p2Active1 = makeFighterInstance('namekian_warrior');
+    const p2Bench0 = makeFighterInstance('dragon_clan_namekian');
+
+    s.players.p1.actives[0] = { ...p1Fighter, summoningSick: false };
+    s.players.p1.kiCurrent = 5;
+    s.players.p2.actives[0] = { ...p2Active0, currentHp: 500 };
+    s.players.p2.actives[1] = p2Active1;
+    s.players.p2.bench[0] = p2Bench0;
+
+    s = applyIntent(s, { type: 'attack', attackerIndex: 0, targetIndex: 0 });
+
+    expect(s.players.p2.actives[0]?.cardId).toBe('dragon_clan_namekian');
+    expect(s.players.p2.actives[1]?.cardId).toBe('namekian_warrior');
+  });
+});
+
+// ---- Test 4: Conditional buff (Nail's Warrior Clan) ----
+describe('Conditional buffs', () => {
+  it("Nail gains +1000 DEF when another Namekian is in the other active slot", () => {
+    let s = makeState({ phase: 'battle' });
+    const nail = makeFighterInstance('nail');
+    const otherNamekian = makeFighterInstance('dragon_clan_namekian');
+
+    s.players.p1.actives[0] = { ...nail, summoningSick: false };
+    s.players.p1.actives[1] = otherNamekian;
+    s.players.p1.kiCurrent = 5;
+
+    const stats = getEffectiveStats(s.players.p1.actives[0]!, 'active', 0, 'p1', s);
+    // Nail base DEF = 2500, +1000 from Warrior Clan = 3500
+    expect(stats.def).toBe(3500);
+  });
+
+  it("Nail does NOT gain +1000 DEF when no other Namekian is active", () => {
+    let s = makeState({ phase: 'battle' });
+    const nail = makeFighterInstance('nail');
+    const saiyan = makeFighterInstance('saiyan_recruit'); // not namekian
+
+    s.players.p1.actives[0] = { ...nail, summoningSick: false };
+    s.players.p1.actives[1] = saiyan;
+    s.players.p1.kiCurrent = 5;
+
+    const stats = getEffectiveStats(s.players.p1.actives[0]!, 'active', 0, 'p1', s);
+    // Nail base DEF = 2500, no bonus
+    expect(stats.def).toBe(2500);
+  });
+
+  it("Bardock gets +2000 ATK at or below half HP", () => {
+    let s = makeState();
+    const bardock = makeFighterInstance('bardock'); // HP: 6000
+    s.players.p1.actives[0] = { ...bardock, currentHp: 3000 }; // exactly half
+
+    const stats = getEffectiveStats(s.players.p1.actives[0]!, 'active', 0, 'p1', s);
+    // Bardock base ATK = 5000, +2000 last_stand = 7000
+    expect(stats.atk).toBe(7000);
+  });
+
+  it("Bardock does NOT get +2000 ATK above half HP", () => {
+    let s = makeState();
+    const bardock = makeFighterInstance('bardock');
+    s.players.p1.actives[0] = { ...bardock, currentHp: 3001 }; // just above half
+
+    const stats = getEffectiveStats(s.players.p1.actives[0]!, 'active', 0, 'p1', s);
+    expect(stats.atk).toBe(5000);
+  });
+});
+
+// ---- Test 5: Min 1000 damage on basic attacks ----
+describe('Minimum 1000 damage rule', () => {
+  it('Attack that would deal negative damage still deals 1000', () => {
+    let s = makeState({ phase: 'battle' });
+    // Attacker ATK 1000, target DEF 5000 → raw = -4000, clamped to 1000
+    const attacker = makeFighterInstance('namekian_child'); // ATK 2000, but we'll use a different setup
+    // Use saiyan_recruit: ATK 2000
+    const attackerF = makeFighterInstance('saiyan_recruit'); // ATK 2000
+    // Target with high DEF — use kami: DEF 4000
+    const targetF = makeFighterInstance('kami'); // ATK 5000, DEF 4000, HP 7000
+
+    s.players.p1.actives[0] = { ...attackerF, summoningSick: false };
+    s.players.p1.kiCurrent = 5;
+    s.players.p2.actives[0] = targetF;
+
+    const initialHp = s.players.p2.actives[0]!.currentHp;
+    s = applyIntent(s, { type: 'attack', attackerIndex: 0, targetIndex: 0 });
+
+    // saiyan_recruit ATK 2000 - kami DEF 4000 = -2000 → min 1000 damage
+    const expectedHp = initialHp - 1000;
+    expect(s.players.p2.actives[0]?.currentHp).toBe(expectedHp);
+  });
+
+  it('Attack where ATK > DEF deals the difference as damage', () => {
+    let s = makeState({ phase: 'battle' });
+    const attackerF = makeFighterInstance('saiyan_brawler'); // ATK 3000, DEF 0
+    const targetF = makeFighterInstance('saiyan_recruit');   // ATK 2000, DEF 1000, HP 3000
+
+    s.players.p1.actives[0] = { ...attackerF, summoningSick: false };
+    s.players.p1.kiCurrent = 5;
+    s.players.p2.actives[0] = targetF;
+
+    s = applyIntent(s, { type: 'attack', attackerIndex: 0, targetIndex: 0 });
+
+    // 3000 ATK - 1000 DEF = 2000 damage
+    expect(s.players.p2.actives[0]?.currentHp).toBe(3000 - 2000);
+  });
+});
+
+// ---- Test 6: Sacrifice does NOT score a KO ----
+describe('Sacrifice does not score a KO', () => {
+  it('Sacrificing a fighter does not increment opponent koScoredAgainst', () => {
+    let s = makeState({ phase: 'main1' });
+    const fighter = makeFighterInstance('saiyan_recruit');
+    s.players.p1.actives[0] = fighter;
+    s.players.p1.kiCurrent = 5;
+
+    const p2KosBefore = s.players.p2.koScoredAgainst;
+    s = applyIntent(s, { type: 'sacrifice', side: 'active', index: 0 });
+
+    expect(s.players.p2.koScoredAgainst).toBe(p2KosBefore);
+  });
+
+  it('Sacrificing does not trigger win condition', () => {
+    let s = makeState({ phase: 'main1' });
+    // P1 has 2 KOs scored against (p1 nearly lost)
+    s.players.p1.koScoredAgainst = 2;
+    const fighter = makeFighterInstance('saiyan_recruit');
+    s.players.p1.actives[0] = fighter;
+    // Also give p2 an active so the board isn't empty
+    s.players.p2.actives[0] = makeFighterInstance('dragon_clan_namekian');
+    s.players.p1.kiCurrent = 5;
+
+    s = applyIntent(s, { type: 'sacrifice', side: 'active', index: 0 });
+
+    // p1's koScoredAgainst should still be 2, not 3
+    expect(s.players.p1.koScoredAgainst).toBe(2);
+    expect(s.winner).toBeNull();
+  });
+});
+
+// ---- Test 7: Self-destruct DOES score for opponent ----
+describe('Self-destruct scores a KO for opponent', () => {
+  it("Android #16 ultimate KOs itself — opponent (p2) scores", () => {
+    let s = makeState({ phase: 'battle' });
+    const android16 = makeFighterInstance('android_16');
+    const target = makeFighterInstance('dragon_clan_namekian');
+
+    s.players.p1.actives[0] = { ...android16, summoningSick: false };
+    s.players.p1.kiCurrent = 5;
+    s.players.p2.actives[0] = target;
+
+    const p1KosBefore = s.players.p1.koScoredAgainst; // 0
+
+    // Use the ultimate (self_destruct_16)
+    s = applyIntent(s, { type: 'ultimate', fighterIndex: 0, targetIndex: 0 });
+
+    // p1 KO'd itself -> p2 scores the KO -> p1's koScoredAgainst increases
+    expect(s.players.p1.koScoredAgainst).toBe(p1KosBefore + 1);
+    // Android #16 should be gone
+    expect(s.players.p1.actives[0]).toBeNull();
+  });
+});
+
+// ---- Test 8: End-of-turn heals capped at maxHp ----
+describe('End-of-turn heals', () => {
+  it('Namekian Warrior Mend heal is capped at maxHp', () => {
+    let s = makeState({ phase: 'end' });
+    const warrior = makeFighterInstance('namekian_warrior'); // HP 3000, heals 500 EOT
+    // Set at full HP
+    s.players.p1.actives[0] = { ...warrior, currentHp: 3000 };
+
+    s = applyIntent(s, { type: 'advance_phase' }); // process EOT for p1 then switch to p2
+
+    // The p1 fighter healed but was already at max — still max
+    // After advance_phase, it switches to p2, but EOT ran for p1
+    // The p1 fighter was processed in p1's EOT
+    // We need to check what happened during p1's EOT
+    // After advance_phase from 'end', it switches to p2.
+    // But p1's fighter state was processed and stored.
+    // Check discard: no, check p1.actives: they remain (just cleared summoningSick etc)
+    const p1ActualPlayer = s.players.p1;
+    expect(p1ActualPlayer.actives[0]?.currentHp).toBeLessThanOrEqual(3000);
+  });
+
+  it('Namekian Warrior heals 500 when below max HP', () => {
+    let s = makeState({ phase: 'end' });
+    const warrior = makeFighterInstance('namekian_warrior'); // HP 3000
+    s.players.p1.actives[0] = { ...warrior, currentHp: 2000 }; // below max
+
+    s = applyIntent(s, { type: 'advance_phase' }); // EOT for p1
+
+    // p1's fighter should now be at 2500
+    expect(s.players.p1.actives[0]?.currentHp).toBe(2500);
+  });
+
+  it('Android #18 heals 1000 at end of turn', () => {
+    let s = makeState({ phase: 'end' });
+    const android18 = makeFighterInstance('android_18'); // HP 5000, heals 1000 EOT
+    s.players.p1.actives[0] = { ...android18, currentHp: 3000 };
+
+    s = applyIntent(s, { type: 'advance_phase' });
+
+    expect(s.players.p1.actives[0]?.currentHp).toBe(4000);
+  });
+
+  it('Heal does not exceed maxHp', () => {
+    let s = makeState({ phase: 'end' });
+    const android18 = makeFighterInstance('android_18'); // HP 5000
+    s.players.p1.actives[0] = { ...android18, currentHp: 4500 }; // only 500 below max
+
+    s = applyIntent(s, { type: 'advance_phase' });
+
+    // Should heal to 5000 (max), not 5500
+    expect(s.players.p1.actives[0]?.currentHp).toBe(5000);
+  });
+});
+
+// ---- Test 9: Ki spending on attack ----
+describe('Ki spending', () => {
+  it('Normal attack costs 1 Ki', () => {
+    let s = makeState({ phase: 'battle' });
+    const attacker = makeFighterInstance('saiyan_brawler');
+    s.players.p1.actives[0] = { ...attacker, summoningSick: false };
+    s.players.p1.kiCurrent = 3;
+    s.players.p2.actives[0] = makeFighterInstance('dragon_clan_namekian');
+
+    s = applyIntent(s, { type: 'attack', attackerIndex: 0, targetIndex: 0 });
+
+    expect(s.players.p1.kiCurrent).toBe(2); // 3 - 1 = 2
+  });
+
+  it('Android #17 attacks cost 0 Ki', () => {
+    let s = makeState({ phase: 'battle' });
+    const android17 = makeFighterInstance('android_17');
+    s.players.p1.actives[0] = { ...android17, summoningSick: false };
+    s.players.p1.kiCurrent = 2;
+    s.players.p2.actives[0] = makeFighterInstance('dragon_clan_namekian');
+
+    s = applyIntent(s, { type: 'attack', attackerIndex: 0, targetIndex: 0 });
+
+    expect(s.players.p1.kiCurrent).toBe(2); // unchanged — costs 0 Ki
+  });
+});
+
+// ---- Test 10: Play hero puts fighter in slot ----
+describe('Play hero', () => {
+  it('Playing a hero from hand puts it in the specified slot', () => {
+    let s = makeState({ phase: 'main1' });
+    s.players.p1.hand = ['saiyan_recruit'];
+    s.players.p1.kiCurrent = 3;
+
+    s = applyIntent(s, { type: 'play_hero', cardId: 'saiyan_recruit', slot: 'active', index: 0 });
+
+    expect(s.players.p1.actives[0]?.cardId).toBe('saiyan_recruit');
+    expect(s.players.p1.hand).not.toContain('saiyan_recruit');
+    expect(s.players.p1.kiCurrent).toBe(2); // cost 1 Ki
+    expect(s.players.p1.actives[0]?.summoningSick).toBe(true);
+  });
+
+  it('Playing Chiaotzu stuns an enemy active', () => {
+    let s = makeState({ phase: 'main1' });
+    s.players.p1.hand = ['chiaotzu'];
+    s.players.p1.kiCurrent = 5;
+    const enemyFighter = makeFighterInstance('dragon_clan_namekian');
+    s.players.p2.actives[0] = enemyFighter;
+
+    s = applyIntent(s, { type: 'play_hero', cardId: 'chiaotzu', slot: 'active', index: 0 });
+
+    const stunStatus = s.players.p2.actives[0]?.statuses.find(st => st.key === 'stun');
+    expect(stunStatus).toBeDefined();
+  });
+});
+
+// ---- Test 11: Phase transitions ----
+describe('Phase transitions', () => {
+  it('advance_phase goes from main1 to battle', () => {
+    let s = makeState({ phase: 'main1' });
+    s = applyIntent(s, { type: 'advance_phase' });
+    expect(s.phase).toBe('battle');
+  });
+
+  it('draw intent moves from draw to main1', () => {
+    let s = makeState({ phase: 'draw' });
+    s.players.p1.piles.hero = ['saiyan_recruit'];
+    s = applyIntent(s, { type: 'draw', pile: 'hero' });
+    expect(s.phase).toBe('main1');
+    expect(s.players.p1.hand).toContain('saiyan_recruit');
+  });
+});
+
+// ---- Test 12: Giant Namekian bonus HP ----
+describe('Giant Namekian', () => {
+  it('Enters with +2000 HP (max HP becomes 9500)', () => {
+    let s = makeState({ phase: 'main1' });
+    s.players.p1.hand = ['giant_namekian'];
+    s.players.p1.kiCurrent = 10;
+
+    s = applyIntent(s, { type: 'play_hero', cardId: 'giant_namekian', slot: 'active', index: 0 });
+
+    expect(s.players.p1.actives[0]?.maxHp).toBe(9500);
+    expect(s.players.p1.actives[0]?.currentHp).toBe(9500);
+  });
+});
+
+// ---- Test 13: Broly legendary counter ----
+describe('Broly Legendary counter', () => {
+  it('Broly gains a legendary counter each time any fighter is KO\'d', () => {
+    let s = makeState({ phase: 'battle' });
+    const broly = makeFighterInstance('broly');
+    const attacker = makeFighterInstance('saiyan_brawler');
+    const target = makeFighterInstance('dragon_clan_namekian');
+
+    s.players.p1.actives[0] = { ...broly };
+    s.players.p1.actives[1] = { ...attacker, summoningSick: false };
+    s.players.p1.kiCurrent = 10;
+    s.players.p2.actives[0] = { ...target, currentHp: 500 };
+
+    s = applyIntent(s, { type: 'attack', attackerIndex: 1, targetIndex: 0 });
+
+    // Broly should have 1 legendary counter
+    expect(s.players.p1.actives[0]?.counters.legendary).toBe(1);
+  });
+
+  it('Broly ATK increases by 500 per legendary counter', () => {
+    let s = makeState();
+    const broly = makeFighterInstance('broly');
+    s.players.p1.actives[0] = { ...broly, counters: { legendary: 3 } };
+
+    const stats = getEffectiveStats(s.players.p1.actives[0]!, 'active', 0, 'p1', s);
+    // Broly base ATK = 7000, +500 * 3 = 8500
+    expect(stats.atk).toBe(8500);
+  });
+});
+
+// ---- Test 14: Kami guardian buff to other active ----
+describe('Kami guardian', () => {
+  it('Other active gains +1000 DEF when Kami is active', () => {
+    let s = makeState();
+    const kami = makeFighterInstance('kami');
+    const warrior = makeFighterInstance('namekian_warrior');
+
+    s.players.p1.actives[0] = kami;
+    s.players.p1.actives[1] = warrior;
+
+    const stats = getEffectiveStats(s.players.p1.actives[1]!, 'active', 1, 'p1', s);
+    // namekian_warrior base DEF = 1500, +1000 from Kami = 2500
+    expect(stats.def).toBe(2500);
+  });
+});
+
+// ---- Test 15: Field buffs ----
+describe('Field buffs', () => {
+  it('Hyperbolic Time Chamber gives all Saiyans +2000 ATK', () => {
+    let s = makeState({ field: 'hyperbolic_time_chamber' });
+    const saiyan = makeFighterInstance('saiyan_recruit'); // ATK 2000
+    s.players.p1.actives[0] = saiyan;
+
+    const stats = getEffectiveStats(s.players.p1.actives[0]!, 'active', 0, 'p1', s);
+    // 2000 + 2000 = 4000
+    expect(stats.atk).toBe(4000);
+  });
+
+  it('King Kai Planet gives all fighters +1000 DEF', () => {
+    let s = makeState({ field: 'king_kais_planet' });
+    const fighter = makeFighterInstance('saiyan_recruit'); // DEF 1000
+    s.players.p1.actives[0] = fighter;
+
+    const stats = getEffectiveStats(s.players.p1.actives[0]!, 'active', 0, 'p1', s);
+    expect(stats.def).toBe(2000); // 1000 + 1000
+  });
+});
+
+// ---- Test 16: Win by empty board ----
+describe('Win by empty board', () => {
+  it("A player wins if opponent has no fighters left", () => {
+    let s = makeState();
+    // Give p1 a fighter so only p2 has an empty board
+    const p1Fighter = makeFighterInstance('saiyan_recruit');
+    s = {
+      ...s,
+      players: {
+        ...s.players,
+        p1: { ...s.players.p1, actives: [p1Fighter, null] as typeof s.players.p1.actives },
+        p2: { ...s.players.p2, actives: [null, null] as typeof s.players.p2.actives, bench: [null, null] as typeof s.players.p2.bench },
+      },
+    };
+
+    s = checkWinLoss(s);
+    expect(s.winner).toBe('p1');
+  });
+});
+
+// ---- Test 17: Nappa Rampage ----
+describe('Nappa Rampage', () => {
+  it('Nappa gains +1000 ATK after a friendly Saiyan is KO\'d', () => {
+    let s = makeState({ phase: 'battle' });
+    const nappa = makeFighterInstance('nappa');
+    // Mark that a friendly Saiyan was KO'd
+    s.players.p1.actives[0] = nappa;
+    s.players.p1.friendlySaiyanKoedThisGame = true;
+
+    const stats = getEffectiveStats(s.players.p1.actives[0]!, 'active', 0, 'p1', s);
+    // Nappa base ATK = 4000, +1000 rampage = 5000
+    expect(stats.atk).toBe(5000);
+  });
+
+  it('Nappa base ATK without rampage', () => {
+    let s = makeState({ phase: 'battle' });
+    const nappa = makeFighterInstance('nappa');
+    s.players.p1.actives[0] = nappa;
+    s.players.p1.friendlySaiyanKoedThisGame = false;
+
+    const stats = getEffectiveStats(s.players.p1.actives[0]!, 'active', 0, 'p1', s);
+    expect(stats.atk).toBe(4000);
+  });
+});
+
+// ---- Test 18: Equipment limit ----
+describe('Equipment limit', () => {
+  it('Cannot attach more than 2 equipment to a fighter', () => {
+    let s = makeState({ phase: 'main1' });
+    const fighter = makeFighterInstance('saiyan_recruit');
+    s.players.p1.actives[0] = { ...fighter, equipment: ['saiyan_armor', 'power_pole'] };
+    s.players.p1.hand = ['weighted_clothing'];
+    s.players.p1.kiCurrent = 5;
+
+    expect(() => {
+      applyIntent(s, { type: 'play_item', cardId: 'weighted_clothing', targetSide: 'active', targetIndex: 0 });
+    }).toThrow('Equipment limit reached');
+  });
+});
