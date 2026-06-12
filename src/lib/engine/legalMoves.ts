@@ -25,6 +25,14 @@ export function legalMoves(state: GameState, player: PlayerId): Intent[] {
 
     case 'main1':
     case 'main2': {
+      // If the player has no active fighters but can afford to deploy one,
+      // they must deploy a hero before playing items, fields, or advancing.
+      const hasActiveHero = ps.actives.some(f => f !== null);
+      const canDeployActiveHero = !hasActiveHero && ps.hand.some(id => {
+        const c = getCard(id);
+        return c.cardType === 'hero' && ps.kiCurrent >= c.kiCost && ps.actives.some(slot => slot === null);
+      });
+
       // Play heroes
       for (const cardId of ps.hand) {
         const card = getCard(cardId);
@@ -41,6 +49,8 @@ export function legalMoves(state: GameState, player: PlayerId): Intent[] {
           }
         }
       }
+
+      if (canDeployActiveHero) break;
 
       // Play items
       for (const cardId of ps.hand) {
