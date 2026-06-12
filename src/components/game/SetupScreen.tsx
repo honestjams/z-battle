@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import type { PlayerId } from '@/lib/engine/types';
+import RulebookModal from './RulebookModal';
 
 export type GameMode = 'hotseat' | 'vs_ai';
 
@@ -95,6 +96,7 @@ export default function SetupScreen({ onStart }: SetupScreenProps) {
   const [p2Deck, setP2Deck] = useState<string | null>(null);
   const [firstPlayer, setFirstPlayer] = useState<PlayerId | null>(null);
   const [gameMode, setGameMode] = useState<GameMode>('hotseat');
+  const [showRulebook, setShowRulebook] = useState(false);
 
   const canStart = p1Deck !== null && p2Deck !== null && firstPlayer !== null;
 
@@ -122,7 +124,7 @@ export default function SetupScreen({ onStart }: SetupScreenProps) {
       }}
     >
       {/* Title */}
-      <div style={{ textAlign: 'center', paddingTop: 16 }}>
+      <div style={{ textAlign: 'center', paddingTop: 16, position: 'relative' }}>
         <h1
           style={{
             fontFamily: 'Bangers, sans-serif',
@@ -149,6 +151,33 @@ export default function SetupScreen({ onStart }: SetupScreenProps) {
         >
           Choose Your Decks
         </p>
+        <button
+          onClick={() => setShowRulebook(true)}
+          style={{
+            position: 'absolute',
+            top: 16,
+            right: 0,
+            background: 'rgba(255,255,255,0.05)',
+            border: '1.5px solid rgba(255,255,255,0.12)',
+            borderRadius: 8,
+            padding: '6px 10px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 5,
+          }}
+        >
+          <span style={{ fontSize: 13 }}>📖</span>
+          <span style={{
+            fontFamily: 'Bangers, sans-serif',
+            fontSize: 11,
+            letterSpacing: 1,
+            color: 'var(--muted)',
+            textTransform: 'uppercase',
+          }}>
+            Rules
+          </span>
+        </button>
       </div>
 
       {/* Deck pickers */}
@@ -298,6 +327,8 @@ export default function SetupScreen({ onStart }: SetupScreenProps) {
       >
         START BATTLE
       </button>
+
+      {showRulebook && <RulebookModal onClose={() => setShowRulebook(false)} />}
     </div>
   );
 }
