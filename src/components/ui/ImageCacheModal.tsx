@@ -206,7 +206,7 @@ export default function ImageCacheModal({ onClose }: ImageCacheModalProps) {
         width: '100%', maxWidth: 320,
         background: c.bg,
         border: `2px solid ${c.vivid}`,
-        borderRadius: 4,
+        borderRadius: 16,
         padding: '22px 20px 20px',
         boxShadow: `0 0 50px ${c.vivid}25, 0 0 100px rgba(0,0,0,0.95)`,
         fontFamily: 'Courier New, monospace',
