@@ -148,6 +148,7 @@ button {
 /* Hand drawer */
 .hand-drawer {
   overflow: hidden;
+  touch-action: none;
 }
 
 /* ---- DBZ UI feature animations ---- */
@@ -288,9 +289,9 @@ button {
   padding-top: max(0px, env(safe-area-inset-top));
 }
 
-/* Momentum scroll for scrollable containers */
+/* Hand scroll: no native iOS momentum scroll — pointer handlers own all touch events */
 .hand-scroll {
-  -webkit-overflow-scrolling: touch;
+  touch-action: none;
 }
 
 @keyframes fieldBgFadeIn {
