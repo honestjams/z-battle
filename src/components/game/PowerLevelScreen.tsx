@@ -12,14 +12,14 @@ interface PowerLevelScreenProps {
 
 type SouterColor = 'green' | 'red' | 'purple' | 'blue';
 
-// bg  = the vivid scouter-lens colour used as the page background
-// text = very dark variant of the same hue for primary readout text
-// muted = medium-dark variant for secondary labels, dividers, brackets
+// bg   = vivid scouter-lens colour at 50% opacity (lets the dark page show through)
+// text = 80% black + 20% vivid — dark, hue-tinted, bold-readable
+// muted = 70% black + 30% vivid — slightly lighter for secondary labels
 const SCOUTER_COLORS: Record<SouterColor, { bg: string; text: string; muted: string }> = {
-  green:  { bg: '#00c426', text: '#001a08', muted: '#004d15' },
-  red:    { bg: '#e82020', text: '#280000', muted: '#5a0000' },
-  purple: { bg: '#b830e8', text: '#1c0028', muted: '#4a0066' },
-  blue:   { bg: '#0096e8', text: '#001428', muted: '#003566' },
+  green:  { bg: 'rgba(0,196,38,0.5)',   text: '#002708', muted: '#003b0b' },
+  red:    { bg: 'rgba(232,32,32,0.5)',  text: '#2e0606', muted: '#460a0a' },
+  purple: { bg: 'rgba(184,48,232,0.5)', text: '#250a2e', muted: '#370e46' },
+  blue:   { bg: 'rgba(0,150,232,0.5)',  text: '#001e2e', muted: '#002d46' },
 };
 
 const DECK_NAMES: Record<string, string> = {
@@ -71,11 +71,11 @@ function computeStats(results: GameResult[]) {
 }
 
 function WinBar({ wins, games, text, muted }: { wins: number; games: number; text: string; muted: string }) {
-  if (games === 0) return <span style={{ color: muted, fontFamily: 'Courier New, monospace', fontSize: 11 }}>NO DATA</span>;
+  if (games === 0) return <span style={{ color: muted, fontFamily: 'Courier New, monospace', fontSize: 11, fontWeight: 700 }}>NO DATA</span>;
   const pct = Math.round((wins / games) * 100);
   const filled = Math.round(pct / 10);
   return (
-    <span style={{ fontFamily: 'Courier New, monospace', fontSize: 12, letterSpacing: 1 }}>
+    <span style={{ fontFamily: 'Courier New, monospace', fontSize: 12, letterSpacing: 1, fontWeight: 700 }}>
       <span style={{ color: text }}>{'█'.repeat(filled)}</span>
       <span style={{ color: muted }}>{'░'.repeat(10 - filled)}</span>
       <span style={{ color: text }}>{' '}{wins}/{games}{'  '}{pct}%</span>
@@ -150,6 +150,7 @@ export default function PowerLevelScreen({ user, onBack }: PowerLevelScreenProps
       padding: 'max(16px, env(safe-area-inset-top)) 20px max(32px, env(safe-area-inset-bottom))',
       position: 'relative', overflow: 'hidden',
       transition: 'background 0.3s',
+      fontWeight: 700,
     }}>
 
       {/* Scanlines overlay */}
