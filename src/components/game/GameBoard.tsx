@@ -1448,7 +1448,7 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
               fontFamily: 'Bangers, sans-serif', fontSize: 11, letterSpacing: 4,
               color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase',
             }}>
-              Draw a card
+              Draw one
             </div>
             <div style={{ display: 'flex', gap: 22, alignItems: 'flex-end' }}>
               {(['hero', 'item', 'field'] as const).map((pile) => {
