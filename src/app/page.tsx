@@ -17,6 +17,7 @@ import SetupScreen, { type GameMode } from '@/components/game/SetupScreen';
 import PassScreen from '@/components/game/PassScreen';
 import WinScreen from '@/components/game/WinScreen';
 import PowerLevelScreen from '@/components/game/PowerLevelScreen';
+import ImageCacheModal, { hasImagesCached } from '@/components/ui/ImageCacheModal';
 
 type Screen =
   | 'loading' | 'auth' | 'lobby' | 'friends'
@@ -44,6 +45,7 @@ export default function Home() {
   const [aiPlayer, setAiPlayer] = useState<PlayerId | null>(null);
   const [currentGameMode, setCurrentGameMode] = useState<GameMode>('hotseat');
   const [winnerState, setWinnerState] = useState<{ winner: PlayerId; deck: string } | null>(null);
+  const [showCacheModal, setShowCacheModal] = useState(false);
   const [pendingAiAttack, setPendingAiAttack] = useState<Intent | null>(null);
   const [pendingAiPlay, setPendingAiPlay] = useState<Intent | null>(null);
 
@@ -59,14 +61,25 @@ export default function Home() {
   // Auth listener
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) { setUser(session.user); setScreen('lobby'); }
-      else setScreen('auth');
+      if (session?.user) {
+        setUser(session.user);
+        setScreen('lobby');
+        if (!hasImagesCached()) setShowCacheModal(true);
+      } else {
+        setScreen('auth');
+      }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
       if (session?.user) {
         setUser(session.user);
-        setScreen(s => (s === 'auth' || s === 'loading') ? 'lobby' : s);
+        setScreen(s => {
+          if (s === 'auth' || s === 'loading') {
+            if (!hasImagesCached()) setShowCacheModal(true);
+            return 'lobby';
+          }
+          return s;
+        });
       } else {
         setUser(null);
         setScreen('auth');
@@ -248,6 +261,7 @@ export default function Home() {
           onPlayOffline={() => setScreen('setup')}
           onOpenFriends={() => setScreen('friends')}
           onPowerLevel={() => setScreen('power_level')}
+          onCacheImages={() => setShowCacheModal(true)}
           onSignOut={() => supabase.auth.signOut()}
         />
       )}
@@ -356,6 +370,10 @@ export default function Home() {
           winnerDeck={winnerState.deck}
           onPlayAgain={() => { setGameState(null); setAiPlayer(null); setWinnerState(null); setScreen('lobby'); }}
         />
+      )}
+
+      {showCacheModal && (
+        <ImageCacheModal onClose={() => setShowCacheModal(false)} />
       )}
 
       {/* Incoming challenge modal — floats over any screen */}

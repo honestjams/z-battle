@@ -21,10 +21,11 @@ interface LobbyScreenProps {
   onPlayOffline: () => void;
   onOpenFriends: () => void;
   onPowerLevel: () => void;
+  onCacheImages: () => void;
   onSignOut: () => void;
 }
 
-export default function LobbyScreen({ user, onCreateMatch, onJoinMatch, onPlayOffline, onOpenFriends, onPowerLevel, onSignOut }: LobbyScreenProps) {
+export default function LobbyScreen({ user, onCreateMatch, onJoinMatch, onPlayOffline, onOpenFriends, onPowerLevel, onCacheImages, onSignOut }: LobbyScreenProps) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [openMatches, setOpenMatches] = useState<Match[]>([]);
   const [myMatches, setMyMatches] = useState<Match[]>([]);
@@ -159,6 +160,17 @@ export default function LobbyScreen({ user, onCreateMatch, onJoinMatch, onPlayOf
           POWER LEVEL
         </button>
       </div>
+
+      {/* Image pre-cache trigger */}
+      <button onClick={onCacheImages} style={{
+        background: 'transparent', border: 'none', cursor: 'pointer',
+        fontFamily: 'Saira Condensed, sans-serif', fontSize: 10,
+        color: 'var(--line)', letterSpacing: 1, textTransform: 'uppercase',
+        textDecoration: 'underline', textDecorationColor: 'var(--line)',
+        padding: '2px 0', alignSelf: 'center',
+      }}>
+        ◈ pre-load card images
+      </button>
 
       {/* Create Online Match */}
       <div style={panel}>
