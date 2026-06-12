@@ -69,6 +69,7 @@ export default function HandCard({ cardId, isSelected = false }: HandCardProps) 
           src={`/${card.image}`}
           alt={name}
           sizes="86px"
+          loading="eager"
           style={{ objectFit: 'cover' }}
         />
       ) : (

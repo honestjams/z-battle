@@ -214,6 +214,7 @@ export default function FighterSlot({
                 src={`/${eqCard.image}`}
                 alt={eqCard.name ?? eqId}
                 sizes="140px"
+                loading="eager"
                 style={{ objectFit: 'cover' }}
               />
             ) : (
@@ -286,6 +287,7 @@ export default function FighterSlot({
               src={`/${card.image}`}
               alt={name}
               sizes="140px"
+              loading="eager"
               style={{ objectFit: 'cover', objectPosition: 'top center' }}
             />
           ) : (
