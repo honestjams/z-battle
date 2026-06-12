@@ -1428,6 +1428,100 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
         );
       })()}
 
+      {/* Draw phase — large centered pile stacks with dim */}
+      {state.phase === 'draw' && !isFirstPlayerTurn1 && isMyTurn && (
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 30,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          pointerEvents: 'none',
+        }}>
+          {/* Dim */}
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', pointerEvents: 'none' }} />
+
+          {/* Pile stacks */}
+          <div style={{
+            position: 'relative',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18,
+            pointerEvents: 'auto',
+          }}>
+            <div style={{
+              fontFamily: 'Bangers, sans-serif', fontSize: 11, letterSpacing: 4,
+              color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase',
+            }}>
+              Draw a card
+            </div>
+            <div style={{ display: 'flex', gap: 22, alignItems: 'flex-end' }}>
+              {(['hero', 'item', 'field'] as const).map((pile) => {
+                const count = myPlayer.piles[pile].length;
+                const hasMove = moves.some(m => m.type === 'draw' && m.pile === pile);
+                const PILE_COLORS: Record<string, { bg: string; border: string; label: string; glow: string }> = {
+                  hero:  { bg: '#111128', border: '#353880', label: '#8090ff', glow: 'rgba(80,100,255,0.45)' },
+                  item:  { bg: '#0e1e0e', border: '#285028', label: '#40b840', glow: 'rgba(40,180,40,0.45)' },
+                  field: { bg: '#1e1408', border: '#6a5020', label: '#d09840', glow: 'rgba(200,150,50,0.45)' },
+                };
+                const c = PILE_COLORS[pile];
+                return (
+                  <div
+                    key={pile}
+                    onClick={hasMove ? () => handleDrawPile(pile) : undefined}
+                    style={{
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
+                      cursor: hasMove ? 'pointer' : 'default',
+                      opacity: hasMove ? 1 : 0.3,
+                      transition: 'opacity 0.2s',
+                    }}
+                  >
+                    {/* Stack layers */}
+                    <div style={{ position: 'relative', width: 76, height: 100 }}>
+                      {[3, 2, 1, 0].map((offset) => (
+                        <div
+                          key={offset}
+                          className={offset === 0 && hasMove ? 'draw-pile-active' : undefined}
+                          style={{
+                            position: 'absolute',
+                            width: 64, height: 86,
+                            borderRadius: 7,
+                            background: hasMove ? c.bg : 'rgba(30,30,30,1)',
+                            border: `1.5px solid ${hasMove ? c.border : 'rgba(255,255,255,0.06)'}`,
+                            left: offset * 4,
+                            top: offset * 4,
+                            ...(offset === 0 && hasMove ? { '--glow-color': c.glow } as React.CSSProperties : {}),
+                          }}
+                        />
+                      ))}
+                      {/* Count */}
+                      <div style={{
+                        position: 'absolute', inset: 0,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        zIndex: 10,
+                      }}>
+                        <span style={{
+                          fontFamily: 'Bangers, sans-serif',
+                          fontSize: 34, letterSpacing: 2,
+                          color: hasMove ? c.label : 'rgba(255,255,255,0.25)',
+                          lineHeight: 1,
+                        }}>
+                          {count}
+                        </span>
+                      </div>
+                    </div>
+                    {/* Pile label */}
+                    <span style={{
+                      fontFamily: 'Bangers, sans-serif',
+                      fontSize: 14, letterSpacing: 2,
+                      color: hasMove ? c.label : 'rgba(255,255,255,0.2)',
+                      textTransform: 'uppercase',
+                    }}>
+                      {pile}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* YOUR TURN banner — DBZ episode title card style */}
       {turnBanner && (
         <div
@@ -1927,42 +2021,6 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
         zIndex: 10,
         marginTop: -14,
       }}>
-        {/* Draw pile buttons */}
-        {state.phase === 'draw' && !isFirstPlayerTurn1 && isMyTurn && (
-          <div style={{ display: 'flex', gap: 8, padding: '8px 12px 0' }}>
-            {(['hero', 'item', 'field'] as const).map((pile) => {
-              const count = myPlayer.piles[pile].length;
-              const hasMove = moves.some((m) => m.type === 'draw' && m.pile === pile);
-              return (
-                <button
-                  key={pile}
-                  onClick={() => handleDrawPile(pile)}
-                  disabled={!hasMove}
-                  style={{
-                    flex: 1,
-                    background: hasMove ? 'rgba(255,122,24,0.15)' : 'rgba(255,255,255,0.04)',
-                    border: `1.5px solid ${hasMove ? 'var(--ki)' : 'var(--line)'}`,
-                    borderRadius: 6,
-                    padding: '8px 4px',
-                    cursor: hasMove ? 'pointer' : 'not-allowed',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: 2,
-                  }}
-                >
-                  <span style={{ fontFamily: 'Bangers, sans-serif', fontSize: 10, color: hasMove ? 'var(--ki)' : 'var(--muted)', letterSpacing: 1, textTransform: 'uppercase' }}>
-                    {pile}
-                  </span>
-                  <span style={{ fontFamily: 'Saira Condensed, sans-serif', fontSize: 9, color: 'var(--muted)' }}>
-                    {count} left
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        )}
-
         {/* Scrollable card row */}
         <div
           ref={handContainerRef}
