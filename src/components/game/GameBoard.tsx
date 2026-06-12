@@ -1737,12 +1737,10 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
                 fontFamily: 'Bangers, sans-serif', fontSize: 11, letterSpacing: 1.5,
                 color: '#0d0f14',
                 background: 'linear-gradient(135deg, var(--ki), var(--ki2))',
-                border: 'none', borderRadius: 16, padding: '10px 12px',
+                border: 'none', borderRadius: 16, padding: '10px 14px',
                 cursor: 'pointer', boxShadow: '0 3px 14px rgba(255,122,24,0.55)',
                 textTransform: 'uppercase', whiteSpace: 'nowrap',
                 WebkitTapHighlightColor: 'transparent',
-                writingMode: 'vertical-rl' as React.CSSProperties['writingMode'],
-                textOrientation: 'mixed' as React.CSSProperties['textOrientation'],
                 opacity: phaseButtonPressed ? 0.75 : 1,
                 transform: phaseButtonPressed ? 'scale(0.96)' : 'scale(1)',
                 transition: 'opacity 0.1s, transform 0.1s',
@@ -1754,9 +1752,8 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
             <span style={{
               fontFamily: 'Bangers, sans-serif', fontSize: 8, color: 'var(--muted)',
               letterSpacing: 1, textTransform: 'uppercase', textAlign: 'center',
-              writingMode: 'vertical-rl' as React.CSSProperties['writingMode'],
               opacity: 0.5,
-            }}>OPP TURN</span>
+            }}>OPP<br/>TURN</span>
           ) : null}
         </div>
 
