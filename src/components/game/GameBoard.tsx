@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import type { GameState, Intent, PlayerId } from '@/lib/engine/types';
 import { legalMoves } from '@/lib/engine';
 import { getCard } from '@/lib/engine/cards';
@@ -1499,12 +1500,16 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
               height: 210,
               borderRadius: 10,
               overflow: 'hidden',
+              position: 'relative',
               background: '#0d0f14',
               boxShadow: '0 0 32px rgba(255,255,255,0.55), 0 12px 40px rgba(0,0,0,0.9)',
             }}>
-              <img
+              <Image
+                fill
                 src={`/${card.image}`}
-                style={{ width: 150, height: 210, display: 'block' }}
+                alt=""
+                sizes="150px"
+                style={{ objectFit: 'cover' }}
               />
             </div>
           </div>
@@ -1529,8 +1534,8 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
                 : `translate(calc(-50% + ${activePos.x}px), calc(-50% + ${activePos.y}px))`,
               transition,
             }}>
-              <div style={{ width: '100%', height: '100%', borderRadius: 8, overflow: 'hidden', background: '#0d0f14', boxShadow: '0 4px 20px rgba(0,0,0,0.85)' }}>
-                {activeCard?.image && <img src={`/${activeCard.image}`} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top center', display: 'block' }} />}
+              <div style={{ width: '100%', height: '100%', borderRadius: 8, overflow: 'hidden', position: 'relative', background: '#0d0f14', boxShadow: '0 4px 20px rgba(0,0,0,0.85)' }}>
+                {activeCard?.image && <Image fill src={`/${activeCard.image}`} alt="" sizes="140px" style={{ objectFit: 'cover', objectPosition: 'top center' }} />}
               </div>
             </div>
             {benchCard?.image && (
@@ -1542,8 +1547,8 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
                   : `translate(calc(-50% + ${benchPos.x}px), calc(-50% + ${benchPos.y}px))`,
                 transition,
               }}>
-                <div style={{ width: '100%', height: '100%', borderRadius: 8, overflow: 'hidden', background: '#0d0f14', boxShadow: '0 4px 20px rgba(0,0,0,0.85)' }}>
-                  <img src={`/${benchCard.image}`} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top center', display: 'block' }} />
+                <div style={{ width: '100%', height: '100%', borderRadius: 8, overflow: 'hidden', position: 'relative', background: '#0d0f14', boxShadow: '0 4px 20px rgba(0,0,0,0.85)' }}>
+                  <Image fill src={`/${benchCard.image}`} alt="" sizes="90px" style={{ objectFit: 'cover', objectPosition: 'top center' }} />
                 </div>
               </div>
             )}
@@ -1565,8 +1570,8 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
             transition: 'transform 0.4s cubic-bezier(0.22, 1, 0.36, 1)',
             opacity: promoteAnimFlying ? 1 : 0.85,
           }}>
-            <div style={{ width: '100%', height: '100%', borderRadius: 8, overflow: 'hidden', background: '#0d0f14', boxShadow: '0 8px 32px rgba(255,122,24,0.5)' }}>
-              {card?.image && <img src={`/${card.image}`} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top center', display: 'block' }} />}
+            <div style={{ width: '100%', height: '100%', borderRadius: 8, overflow: 'hidden', position: 'relative', background: '#0d0f14', boxShadow: '0 8px 32px rgba(255,122,24,0.5)' }}>
+              {card?.image && <Image fill src={`/${card.image}`} alt="" sizes="140px" style={{ objectFit: 'cover', objectPosition: 'top center' }} />}
             </div>
           </div>
         );
@@ -1625,8 +1630,8 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
                         minWidth: 90,
                       }}
                     >
-                      <div style={{ width: 70, height: 98, borderRadius: 6, overflow: 'hidden', background: '#0d0f14' }}>
-                        {card?.image && <img src={`/${card.image}`} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top center', display: 'block' }} />}
+                      <div style={{ width: 70, height: 98, borderRadius: 6, overflow: 'hidden', position: 'relative', background: '#0d0f14' }}>
+                        {card?.image && <Image fill src={`/${card.image}`} alt="" sizes="70px" style={{ objectFit: 'cover', objectPosition: 'top center' }} />}
                       </div>
                       <span style={{ fontFamily: 'Saira Condensed, sans-serif', fontSize: 10, color: 'var(--ink)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                         {card?.name ?? f.cardId}
@@ -2328,10 +2333,11 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
                     <div key={idx} style={{
                       width: 72, height: 100, borderRadius: 6,
                       border: '1px solid var(--line)', overflow: 'hidden',
+                      position: 'relative',
                       flexShrink: 0, background: 'var(--panel2)',
                     }}>
                       {rc?.image ? (
-                        <img src={`/${rc.image}`} alt={rc.name ?? cId} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                        <Image fill src={`/${rc.image}`} alt={rc.name ?? cId} sizes="72px" style={{ objectFit: 'cover' }} />
                       ) : (
                         <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           <span style={{ fontFamily: 'Bangers, sans-serif', fontSize: 20, color: 'rgba(255,255,255,0.3)' }}>

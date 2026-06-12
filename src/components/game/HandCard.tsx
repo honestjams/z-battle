@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import { getCard } from '@/lib/engine/cards';
 
 interface HandCardProps {
@@ -63,10 +64,12 @@ export default function HandCard({ cardId, isSelected = false }: HandCardProps) 
       }}
     >
       {card?.image ? (
-        <img
+        <Image
+          fill
           src={`/${card.image}`}
           alt={name}
-          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          sizes="86px"
+          style={{ objectFit: 'cover' }}
         />
       ) : (
         <div style={{
