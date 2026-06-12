@@ -196,6 +196,10 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
   const pendingCardDispatch = useRef<(() => void) | null>(null);
   const cardAnimLock = useRef(false);
 
+  // Long-press hold: scale card 1.5× instead of native iOS callout
+  const [heldCardOrigIdx, setHeldCardOrigIdx] = useState<number | null>(null);
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   type RetreatAnim = {
     activeCardId: string;
     benchCardId: string | null;
@@ -2071,11 +2075,20 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
             const isHandSelected = selection.mode === 'hand_card_selected' && selection.cardId === cardId;
             const isPlayable = playableCards.has(cardId);
             const canDrag = isMyTurn && isPlayable && isMainPhase;
+            const isHeld = heldCardOrigIdx === origIdx;
 
             return (
               <div
                 key={`${cardId}-${origIdx}`}
+                onContextMenu={(e) => e.preventDefault()}
                 onPointerDown={(e) => {
+                  // Start long-press timer — fires regardless of drag permission
+                  if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+                  holdTimerRef.current = setTimeout(() => {
+                    holdTimerRef.current = null;
+                    setHeldCardOrigIdx(origIdx);
+                  }, 400);
+
                   if (!canDrag) return;
                   e.preventDefault();
                   e.currentTarget.setPointerCapture(e.pointerId);
@@ -2093,12 +2106,19 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
                   const d = dragRef.current;
                   if (!d || d.handIdx !== origIdx) return;
                   const dist = Math.hypot(e.clientX - d.startX, e.clientY - d.startY);
+                  if (dist >= 8) {
+                    // Cancel long-press on any significant movement
+                    if (holdTimerRef.current) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null; }
+                    setHeldCardOrigIdx(null);
+                  }
                   const active = d.active || dist >= 8;
                   const updated = { ...d, x: e.clientX, y: e.clientY, active };
                   dragRef.current = updated;
                   setDrag(updated);
                 }}
                 onPointerUp={(e) => {
+                  if (holdTimerRef.current) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null; }
+                  if (heldCardOrigIdx === origIdx) { setHeldCardOrigIdx(null); return; }
                   const d = dragRef.current;
                   if (!d || d.handIdx !== origIdx) {
                     setZoomedCard({ cardId, handIdx: origIdx });
@@ -2112,6 +2132,8 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
                   }
                 }}
                 onPointerCancel={() => {
+                  if (holdTimerRef.current) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null; }
+                  setHeldCardOrigIdx(null);
                   if (dragRef.current?.handIdx === origIdx) {
                     dragRef.current = null;
                     setDrag(null);
@@ -2121,12 +2143,13 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
                 style={{
                   opacity: 1,
                   flexShrink: 0,
-                  touchAction: canDrag ? 'none' : 'auto',
+                  touchAction: 'none',
+                  WebkitTouchCallout: 'none' as any,
                   cursor: canDrag ? 'grab' : 'pointer',
                   WebkitTapHighlightColor: 'rgba(255,255,255,0.08)',
-                  transform: `rotate(${(i - fanCenter) * fanAngleStep}deg) translateY(${Math.pow(i - fanCenter, 2) * 2.5 - (isHandSelected ? 38 : 0)}px) scale(${isHandSelected ? 1.06 : 1})`,
+                  transform: `rotate(${isHeld ? 0 : (i - fanCenter) * fanAngleStep}deg) translateY(${isHeld ? -20 : (Math.pow(i - fanCenter, 2) * 2.5 - (isHandSelected ? 38 : 0))}px) scale(${isHeld ? 1.5 : (isHandSelected ? 1.06 : 1)})`,
                   transformOrigin: 'center bottom',
-                  zIndex: isHandSelected ? handCount + 5 : i,
+                  zIndex: isHeld ? handCount + 20 : (isHandSelected ? handCount + 5 : i),
                   transition: 'transform 0.15s ease, margin-left 0.2s ease',
                   marginLeft: i > 0 ? -overlap : 0,
                 }}
