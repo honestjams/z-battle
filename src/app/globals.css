@@ -147,7 +147,7 @@ button {
 
 /* Hand drawer */
 .hand-drawer {
-  overflow: visible;
+  overflow: hidden;
 }
 
 /* ---- DBZ UI feature animations ---- */

@@ -1952,7 +1952,7 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
         <div
           ref={handContainerRef}
           className="hand-drawer"
-          style={{ minHeight: 'min(132px, 16dvh)', overflow: 'visible' }}
+          style={{ minHeight: 'min(132px, 16dvh)' }}
         >
         <div
           className="hand-scroll"
