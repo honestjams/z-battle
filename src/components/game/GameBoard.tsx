@@ -1508,7 +1508,8 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
                 fill
                 src={`/${card.image}`}
                 alt=""
-                sizes="150px"
+                sizes="86px"
+                loading="eager"
                 style={{ objectFit: 'cover' }}
               />
             </div>
