@@ -785,6 +785,7 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
   function handleHandCardTap(handIdx: number, cardId: string) {
     if (cardAnimLock.current) return;
     if (!isMyTurn && perspective !== undefined) return;
+    if (state.phase !== 'main1' && state.phase !== 'main2') return;
     if (selection.mode === 'hand_card_selected' && selection.cardId === cardId) {
       const noTargetMove = moves.find(m =>
         (m.type === 'play_field' && m.cardId === cardId) ||
@@ -912,48 +913,59 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
           if (abKind === 'direct_damage' || abKind === 'delayed_damage') {
             safeIntent({ type: 'play_item', cardId, targetIndex: index });
             setSelection({ mode: 'idle' });
+            return;
           }
         }
-        return;
-      }
-
-      if (card.cardType === 'hero') {
+        // Non-actionable opponent tap — clear selection and fall through to opponent zoom
+        setSelection({ mode: 'idle' });
+      } else if (card.cardType === 'hero') {
         const fighter = side === 'active' ? myPlayer.actives[index] : myPlayer.bench[index];
-        if (fighter !== null) return;
-
-        const isChiaotzu = card.abilities.some(
-          (ab) => ab.kind === 'triggered_on_play' && (ab.params as Record<string, unknown>)['effect'] === 'stun'
-        );
-        if (isChiaotzu && oppPlayer.actives.some((f) => f !== null)) {
-          setSelection({
-            mode: 'chiaotzu_stun_select',
-            handIdx,
-            cardId,
-            slot: side,
-            index,
-          });
+        if (fighter === null) {
+          const isChiaotzu = card.abilities.some(
+            (ab) => ab.kind === 'triggered_on_play' && (ab.params as Record<string, unknown>)['effect'] === 'stun'
+          );
+          if (isChiaotzu && oppPlayer.actives.some((f) => f !== null)) {
+            setSelection({
+              mode: 'chiaotzu_stun_select',
+              handIdx,
+              cardId,
+              slot: side,
+              index,
+            });
+            return;
+          }
+          safeIntent({ type: 'play_hero', cardId, slot: side, index });
+          setSelection({ mode: 'idle' });
           return;
         }
-
-        safeIntent({ type: 'play_hero', cardId, slot: side, index });
+        // Occupied slot — clear selection and fall through to fighter zoom
         setSelection({ mode: 'idle' });
       } else if (card.cardType === 'item') {
         const abKind = card.abilities[0]?.kind;
         if (abKind === 'sacrifice_for_damage') {
           const hasMove = moves.some(m => m.type === 'play_item' && m.cardId === cardId && (m as any).targetSide === side && (m as any).targetIndex === index);
-          if (!hasMove) return;
-          setSelection({ mode: 'self_destruct_enemy_select', handIdx, cardId, sacrificeSide: side, sacrificeIndex: index });
+          if (hasMove) {
+            setSelection({ mode: 'self_destruct_enemy_select', handIdx, cardId, sacrificeSide: side, sacrificeIndex: index });
+            return;
+          }
         } else if (abKind === 'heal' || abKind === 'attach_stat' || abKind === 'attach_trigger' ||
           abKind === 'remove_summoning_sickness' || abKind === 'prevent_damage') {
           const fighter = side === 'active' ? myPlayer.actives[index] : myPlayer.bench[index];
-          if (!fighter) return;
-          const move = moves.find(m => m.type === 'play_item' && m.cardId === cardId && (m as any).targetSide === side && (m as any).targetIndex === index);
-          if (!move) return;
-          safeIntent(move);
-          setSelection({ mode: 'idle' });
+          if (fighter) {
+            const move = moves.find(m => m.type === 'play_item' && m.cardId === cardId && (m as any).targetSide === side && (m as any).targetIndex === index);
+            if (move) {
+              safeIntent(move);
+              setSelection({ mode: 'idle' });
+              return;
+            }
+          }
         }
+        // No actionable item move — clear selection and fall through to fighter zoom
+        setSelection({ mode: 'idle' });
+      } else {
+        setSelection({ mode: 'idle' });
       }
-      return;
+      // Fall through to fighter zoom logic below
     }
 
     if (selection.mode === 'attacker_selected' && !isOpponent && side === 'active' && selection.attackerIdx === index) {
