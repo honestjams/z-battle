@@ -12,11 +12,14 @@ interface PowerLevelScreenProps {
 
 type SouterColor = 'green' | 'red' | 'purple' | 'blue';
 
-const SCOUTER_COLORS: Record<SouterColor, { primary: string; dim: string; bg: string }> = {
-  green:  { primary: '#00ff41', dim: '#004d15',  bg: 'rgba(0,255,65,0.04)'  },
-  red:    { primary: '#ff3333', dim: '#4d0000',  bg: 'rgba(255,51,51,0.04)' },
-  purple: { primary: '#cc44ff', dim: '#3d0052',  bg: 'rgba(204,68,255,0.04)'},
-  blue:   { primary: '#00aaff', dim: '#003352',  bg: 'rgba(0,170,255,0.04)' },
+// bg  = the vivid scouter-lens colour used as the page background
+// text = very dark variant of the same hue for primary readout text
+// muted = medium-dark variant for secondary labels, dividers, brackets
+const SCOUTER_COLORS: Record<SouterColor, { bg: string; text: string; muted: string }> = {
+  green:  { bg: '#00c426', text: '#001a08', muted: '#004d15' },
+  red:    { bg: '#e82020', text: '#280000', muted: '#5a0000' },
+  purple: { bg: '#b830e8', text: '#1c0028', muted: '#4a0066' },
+  blue:   { bg: '#0096e8', text: '#001428', muted: '#003566' },
 };
 
 const DECK_NAMES: Record<string, string> = {
@@ -67,14 +70,15 @@ function computeStats(results: GameResult[]) {
   };
 }
 
-function WinBar({ wins, games, color, dim }: { wins: number; games: number; color: string; dim: string }) {
-  if (games === 0) return <span style={{ color: dim, fontFamily: 'Courier New, monospace', fontSize: 11 }}>NO DATA</span>;
+function WinBar({ wins, games, text, muted }: { wins: number; games: number; text: string; muted: string }) {
+  if (games === 0) return <span style={{ color: muted, fontFamily: 'Courier New, monospace', fontSize: 11 }}>NO DATA</span>;
   const pct = Math.round((wins / games) * 100);
   const filled = Math.round(pct / 10);
   return (
-    <span style={{ fontFamily: 'Courier New, monospace', fontSize: 12, color, letterSpacing: 1 }}>
-      {'█'.repeat(filled)}{'░'.repeat(10 - filled)}
-      {' '}{wins}/{games}{'  '}{pct}%
+    <span style={{ fontFamily: 'Courier New, monospace', fontSize: 12, letterSpacing: 1 }}>
+      <span style={{ color: text }}>{'█'.repeat(filled)}</span>
+      <span style={{ color: muted }}>{'░'.repeat(10 - filled)}</span>
+      <span style={{ color: text }}>{' '}{wins}/{games}{'  '}{pct}%</span>
     </span>
   );
 }
@@ -117,7 +121,7 @@ export default function PowerLevelScreen({ user, onBack }: PowerLevelScreenProps
   const divider = (
     <div style={{
       fontFamily: 'Courier New, monospace', fontSize: 11,
-      color: color.dim, letterSpacing: 1, margin: '2px 0',
+      color: color.muted, letterSpacing: 1, margin: '2px 0',
     }}>
       {'━'.repeat(32)}
     </div>
@@ -125,10 +129,10 @@ export default function PowerLevelScreen({ user, onBack }: PowerLevelScreenProps
 
   const row = (label: string, value: React.ReactNode) => (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, minHeight: 22 }}>
-      <span style={{ fontFamily: 'Courier New, monospace', fontSize: 11, color: color.dim, textTransform: 'uppercase', letterSpacing: 1, flexShrink: 0 }}>
+      <span style={{ fontFamily: 'Courier New, monospace', fontSize: 11, color: color.muted, textTransform: 'uppercase', letterSpacing: 1, flexShrink: 0 }}>
         {label}
       </span>
-      <span style={{ fontFamily: 'Courier New, monospace', fontSize: 12, color: color.primary, textAlign: 'right' }}>
+      <span style={{ fontFamily: 'Courier New, monospace', fontSize: 12, color: color.text, textAlign: 'right' }}>
         {value}
       </span>
     </div>
@@ -141,22 +145,23 @@ export default function PowerLevelScreen({ user, onBack }: PowerLevelScreenProps
   return (
     <div style={{
       width: '100%', maxWidth: 430, minHeight: '100dvh', margin: '0 auto',
-      background: '#000',
+      background: color.bg,
       display: 'flex', flexDirection: 'column',
       padding: 'max(16px, env(safe-area-inset-top)) 20px max(32px, env(safe-area-inset-bottom))',
       position: 'relative', overflow: 'hidden',
+      transition: 'background 0.3s',
     }}>
 
       {/* Scanlines overlay */}
       <div style={{
         position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0,
-        backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.18) 2px, rgba(0,0,0,0.18) 4px)',
+        backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.10) 2px, rgba(0,0,0,0.10) 4px)',
       }} />
 
       {/* Corner bracket decorations */}
-      <div style={{ position: 'absolute', top: 12, left: 12, color: color.primary, fontFamily: 'Courier New, monospace', fontSize: 16, opacity: 0.5, pointerEvents: 'none', zIndex: 1 }}>⌐</div>
-      <div style={{ position: 'absolute', top: 12, right: 12, color: color.primary, fontFamily: 'Courier New, monospace', fontSize: 16, opacity: 0.5, pointerEvents: 'none', zIndex: 1, transform: 'scaleX(-1)' }}>⌐</div>
-      <div style={{ position: 'absolute', bottom: 48, left: 12, color: color.primary, fontFamily: 'Courier New, monospace', fontSize: 16, opacity: 0.5, pointerEvents: 'none', zIndex: 1, transform: 'scaleY(-1)' }}>⌐</div>
+      <div style={{ position: 'absolute', top: 12, left: 12, color: color.text, fontFamily: 'Courier New, monospace', fontSize: 16, opacity: 0.4, pointerEvents: 'none', zIndex: 1 }}>⌐</div>
+      <div style={{ position: 'absolute', top: 12, right: 12, color: color.text, fontFamily: 'Courier New, monospace', fontSize: 16, opacity: 0.4, pointerEvents: 'none', zIndex: 1, transform: 'scaleX(-1)' }}>⌐</div>
+      <div style={{ position: 'absolute', bottom: 48, left: 12, color: color.text, fontFamily: 'Courier New, monospace', fontSize: 16, opacity: 0.4, pointerEvents: 'none', zIndex: 1, transform: 'scaleY(-1)' }}>⌐</div>
 
       <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', gap: 0, flex: 1 }}>
 
@@ -165,28 +170,27 @@ export default function PowerLevelScreen({ user, onBack }: PowerLevelScreenProps
           <button onClick={onBack} style={{
             background: 'transparent', border: 'none', cursor: 'pointer',
             fontFamily: 'Courier New, monospace', fontSize: 11,
-            color: color.dim, textTransform: 'uppercase', letterSpacing: 1,
+            color: color.muted, textTransform: 'uppercase', letterSpacing: 1,
             padding: 0, marginBottom: 16,
           }}>
             ← BACK
           </button>
-          <div style={{ fontFamily: 'Courier New, monospace', fontSize: 10, color: color.dim, letterSpacing: 3, marginBottom: 4 }}>
+          <div style={{ fontFamily: 'Courier New, monospace', fontSize: 10, color: color.muted, letterSpacing: 3, marginBottom: 4 }}>
             ◈ CAPSULE CORP SCOUTER v3.1
           </div>
           <div style={{
             fontFamily: 'Courier New, monospace', fontSize: 22,
-            color: color.primary, letterSpacing: 4, textTransform: 'uppercase',
-            textShadow: `0 0 12px ${color.primary}, 0 0 24px ${color.primary}60`,
+            color: color.text, letterSpacing: 4, textTransform: 'uppercase',
           }}>
             POWER LEVEL
           </div>
-          <div style={{ fontFamily: 'Courier New, monospace', fontSize: 10, color: color.dim, letterSpacing: 2, marginTop: 2 }}>
+          <div style={{ fontFamily: 'Courier New, monospace', fontSize: 10, color: color.muted, letterSpacing: 2, marginTop: 2 }}>
             COMBAT ANALYSIS: {user.email}
           </div>
         </div>
 
         {loading ? (
-          <div style={{ fontFamily: 'Courier New, monospace', fontSize: 13, color: color.dim, letterSpacing: 2, marginTop: 32, textAlign: 'center' }}>
+          <div style={{ fontFamily: 'Courier New, monospace', fontSize: 13, color: color.muted, letterSpacing: 2, marginTop: 32, textAlign: 'center' }}>
             SCANNING…
           </div>
         ) : (
@@ -194,51 +198,51 @@ export default function PowerLevelScreen({ user, onBack }: PowerLevelScreenProps
 
             {/* VS AI */}
             {divider}
-            <div style={{ fontFamily: 'Courier New, monospace', fontSize: 10, color: color.dim, letterSpacing: 3, marginBottom: 4 }}>▸ VS AI</div>
+            <div style={{ fontFamily: 'Courier New, monospace', fontSize: 10, color: color.text, letterSpacing: 3, marginBottom: 4, fontWeight: 700 }}>▸ VS AI</div>
             {row('GAMES ANALYZED', stats.ai.games)}
-            {row('VICTORIES', <WinBar wins={stats.ai.wins} games={stats.ai.games} color={color.primary} dim={color.dim} />)}
+            {row('VICTORIES', <WinBar wins={stats.ai.wins} games={stats.ai.games} text={color.text} muted={color.muted} />)}
 
             {/* HOTSEAT */}
             {divider}
-            <div style={{ fontFamily: 'Courier New, monospace', fontSize: 10, color: color.dim, letterSpacing: 3, marginBottom: 4 }}>▸ HOTSEAT</div>
+            <div style={{ fontFamily: 'Courier New, monospace', fontSize: 10, color: color.text, letterSpacing: 3, marginBottom: 4, fontWeight: 700 }}>▸ HOTSEAT</div>
             {row('GAMES ANALYZED', stats.hotseat.games)}
-            {row('VICTORIES', <WinBar wins={stats.hotseat.wins} games={stats.hotseat.games} color={color.primary} dim={color.dim} />)}
+            {row('VICTORIES', <WinBar wins={stats.hotseat.wins} games={stats.hotseat.games} text={color.text} muted={color.muted} />)}
 
             {/* ONLINE */}
             {divider}
-            <div style={{ fontFamily: 'Courier New, monospace', fontSize: 10, color: color.dim, letterSpacing: 3, marginBottom: 4 }}>▸ ONLINE</div>
+            <div style={{ fontFamily: 'Courier New, monospace', fontSize: 10, color: color.text, letterSpacing: 3, marginBottom: 4, fontWeight: 700 }}>▸ ONLINE</div>
             {row('GAMES ANALYZED', stats.online.games)}
-            {row('VICTORIES', <WinBar wins={stats.online.wins} games={stats.online.games} color={color.primary} dim={color.dim} />)}
+            {row('VICTORIES', <WinBar wins={stats.online.wins} games={stats.online.games} text={color.text} muted={color.muted} />)}
 
             {/* Deck analysis */}
             {divider}
-            <div style={{ fontFamily: 'Courier New, monospace', fontSize: 10, color: color.dim, letterSpacing: 3, marginBottom: 4 }}>▸ UNIT ANALYSIS</div>
+            <div style={{ fontFamily: 'Courier New, monospace', fontSize: 10, color: color.text, letterSpacing: 3, marginBottom: 4, fontWeight: 700 }}>▸ UNIT ANALYSIS</div>
             {row('PREFERRED UNIT',
               stats.favDeck
-                ? <>{DECK_NAMES[stats.favDeck.deck] ?? stats.favDeck.deck.toUpperCase()}<span style={{ color: color.dim, fontSize: 10 }}> ×{stats.favDeck.count}</span></>
-                : <span style={{ color: color.dim }}>—</span>
+                ? <>{DECK_NAMES[stats.favDeck.deck] ?? stats.favDeck.deck.toUpperCase()}<span style={{ color: color.muted, fontSize: 10 }}> ×{stats.favDeck.count}</span></>
+                : <span style={{ color: color.muted }}>—</span>
             )}
             {row('OPTIMAL UNIT',
               stats.bestDeck
-                ? <>{DECK_NAMES[stats.bestDeck.deck] ?? stats.bestDeck.deck.toUpperCase()}<span style={{ color: color.dim, fontSize: 10 }}> {stats.bestDeck.pct}% ({stats.bestDeck.games}g)</span></>
-                : <span style={{ color: color.dim, fontSize: 11 }}>{stats.totalGames < 3 ? 'NEED 3+ GAMES' : '—'}</span>
+                ? <>{DECK_NAMES[stats.bestDeck.deck] ?? stats.bestDeck.deck.toUpperCase()}<span style={{ color: color.muted, fontSize: 10 }}> {stats.bestDeck.pct}% ({stats.bestDeck.games}g)</span></>
+                : <span style={{ color: color.muted, fontSize: 11 }}>{stats.totalGames < 3 ? 'NEED 3+ GAMES' : '—'}</span>
             )}
 
             {/* Power level total */}
             {divider}
-            <div style={{ fontFamily: 'Courier New, monospace', fontSize: 10, color: color.dim, letterSpacing: 3, marginBottom: 4 }}>▸ POWER READING</div>
+            <div style={{ fontFamily: 'Courier New, monospace', fontSize: 10, color: color.text, letterSpacing: 3, marginBottom: 4, fontWeight: 700 }}>▸ POWER READING</div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontFamily: 'Courier New, monospace', fontSize: 11, color: color.dim, letterSpacing: 1 }}>POWER LEVEL</span>
+              <span style={{ fontFamily: 'Courier New, monospace', fontSize: 11, color: color.muted, letterSpacing: 1 }}>POWER LEVEL</span>
               <span style={{
                 fontFamily: 'Courier New, monospace', fontSize: 28,
-                color: color.primary, letterSpacing: 4,
-                textShadow: `0 0 16px ${color.primary}, 0 0 32px ${color.primary}80`,
+                color: color.text, letterSpacing: 4,
               }}>
                 {stats.power.toLocaleString()}
               </span>
             </div>
-            <div style={{ marginTop: 4, fontFamily: 'Courier New, monospace', fontSize: 14, color: color.primary, letterSpacing: 2 }}>
-              {'█'.repeat(powerFilled)}{'░'.repeat(10 - powerFilled)}
+            <div style={{ marginTop: 4, fontFamily: 'Courier New, monospace', fontSize: 14, letterSpacing: 2 }}>
+              <span style={{ color: color.text }}>{'█'.repeat(powerFilled)}</span>
+              <span style={{ color: color.muted }}>{'░'.repeat(10 - powerFilled)}</span>
             </div>
             {divider}
 
@@ -255,11 +259,11 @@ export default function PowerLevelScreen({ user, onBack }: PowerLevelScreenProps
           right: 20,
           width: 52, height: 52,
           borderRadius: '50%',
-          background: color.bg,
-          border: `2px solid ${color.primary}`,
+          background: color.muted,
+          border: `2px solid ${color.text}`,
           cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: `0 0 12px ${color.primary}80`,
+          boxShadow: `0 2px 12px rgba(0,0,0,0.35)`,
           zIndex: 10,
         }}
         title="Change scouter colour"
@@ -267,8 +271,7 @@ export default function PowerLevelScreen({ user, onBack }: PowerLevelScreenProps
         {/* Placeholder — replace src with real image when ready */}
         <span style={{
           fontFamily: 'Courier New, monospace', fontSize: 18,
-          color: color.primary,
-          textShadow: `0 0 8px ${color.primary}`,
+          color: color.bg,
         }}>
           ◉
         </span>
