@@ -201,6 +201,10 @@ export function chooseMove(state: GameState, player: PlayerId): Intent | null {
         return benchHeroes.sort((a, b) => getCard(b.cardId).kiCost - getCard(a.cardId).kiCost)[0];
       }
 
+      // Play field card — type buff for our fighters
+      const fields = moves.filter((m): m is Extract<Intent, { type: 'play_field' }> => m.type === 'play_field');
+      if (fields.length > 0) return fields[0];
+
       break;
     }
 

@@ -18,6 +18,7 @@ import PassScreen from '@/components/game/PassScreen';
 import WinScreen from '@/components/game/WinScreen';
 import PowerLevelScreen from '@/components/game/PowerLevelScreen';
 import ImageCacheModal, { hasImagesCached } from '@/components/ui/ImageCacheModal';
+import DeckScoutModal from '@/components/game/DeckScoutModal';
 
 type Screen =
   | 'loading' | 'auth' | 'lobby' | 'friends'
@@ -46,6 +47,9 @@ export default function AppContent() {
   const [currentGameMode, setCurrentGameMode] = useState<GameMode>('hotseat');
   const [winnerState, setWinnerState] = useState<{ winner: PlayerId; deck: string } | null>(null);
   const [showCacheModal, setShowCacheModal] = useState(false);
+  const [pendingSetup, setPendingSetup] = useState<{
+    p1Deck: string; p2Deck: string; firstPlayer: PlayerId; mode: GameMode;
+  } | null>(null);
   const [pendingAiAttack, setPendingAiAttack] = useState<Intent | null>(null);
   const [pendingAiPlay, setPendingAiPlay] = useState<Intent | null>(null);
 
@@ -198,11 +202,18 @@ export default function AppContent() {
   }, [aiPlayer, screen, gameState, handleIntent, pendingAiAttack, pendingAiPlay]);
 
   function handleSetupStart(p1Deck: string, p2Deck: string, firstPlayer: PlayerId, mode: GameMode) {
+    setPendingSetup({ p1Deck, p2Deck, firstPlayer, mode });
+  }
+
+  function handleScoutDone() {
+    if (!pendingSetup) return;
+    const { p1Deck, p2Deck, firstPlayer, mode } = pendingSetup;
     const state = createInitialState(p1Deck, p2Deck, firstPlayer);
     setGameState(state);
     setCurrentGameMode(mode);
     const ai = mode === 'vs_ai' ? AI_PLAYER : null;
     setAiPlayer(ai);
+    setPendingSetup(null);
     setScreen(ai ? 'game' : 'pass');
   }
 
@@ -370,6 +381,15 @@ export default function AppContent() {
 
       {showCacheModal && (
         <ImageCacheModal onClose={() => setShowCacheModal(false)} />
+      )}
+
+      {pendingSetup && (
+        <DeckScoutModal
+          p1Deck={pendingSetup.p1Deck}
+          p2Deck={pendingSetup.p2Deck}
+          isVsAi={pendingSetup.mode === 'vs_ai'}
+          onDone={handleScoutDone}
+        />
       )}
 
       {incomingChallenge && (

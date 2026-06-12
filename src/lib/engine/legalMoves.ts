@@ -18,6 +18,8 @@ export function legalMoves(state: GameState, player: PlayerId): Intent[] {
           moves.push({ type: 'draw', pile });
         }
       }
+      // All piles exhausted — allow skipping to main1
+      if (moves.length === 0) moves.push({ type: 'advance_phase' });
       break;
     }
 
