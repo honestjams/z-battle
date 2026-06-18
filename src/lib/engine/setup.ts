@@ -17,6 +17,17 @@ function hasOneCostOneHero(hand: string[]): boolean {
   });
 }
 
+// Some decks (e.g. ones with no kiCost-1 hero in their hero pile) can never
+// satisfy hasOneCostOneHero, which would otherwise redraw forever. Only
+// enforce the redraw when the deck's hero pile actually contains a
+// kiCost-1 hero to draw into.
+function deckCanHaveCostOneHero(heroIds: string[]): boolean {
+  return heroIds.some(id => {
+    const c = getCard(id);
+    return c.cardType === 'hero' && c.kiCost === 1;
+  });
+}
+
 function makePiles(deckId: string): { hero: string[]; item: string[]; field: string[] } {
   const deck = DECKS[deckId];
   return {
@@ -32,11 +43,12 @@ function dealOpeningHand(piles: { hero: string[]; item: string[]; field: string[
 } {
   let hand: string[];
   let heroPile = [...piles.hero];
+  const requireCostOneHero = deckCanHaveCostOneHero(piles.hero);
   do {
     // Reset and redraw
     heroPile = shuffle([...piles.hero]);
     hand = heroPile.splice(0, 5);
-  } while (!hasOneCostOneHero(hand));
+  } while (requireCostOneHero && !hasOneCostOneHero(hand));
   return { hand, piles: { ...piles, hero: heroPile } };
 }
 

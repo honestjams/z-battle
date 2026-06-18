@@ -17,12 +17,13 @@ interface SetupScreenProps {
   onCacheImages?: () => void;
 }
 
-const DECK_IDS = ['saiyan', 'android', 'frieza_force'];
+const DECK_IDS = ['saiyan', 'android', 'frieza_force', 'cars'];
 
 const DECK_OPTIONS = [
   { id: 'saiyan', name: 'The Crew', color: '#ff7a18' },
   { id: 'android', name: 'The Network', color: '#3aa6ff' },
   { id: 'frieza_force', name: 'Icons', color: '#b44dff' },
+  { id: 'cars', name: 'The Grid', color: '#2ee6a8' },
 ];
 
 function getDeckImages(deckId: string): string[] {
