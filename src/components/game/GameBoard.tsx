@@ -231,6 +231,8 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
   };
   const [beamStruggle, setBeamStruggle] = useState<BeamStruggleData | null>(null);
   const beamTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stateRef = useRef(state);
+  useEffect(() => { stateRef.current = state; }, [state]);
   const boardRef = useRef<HTMLDivElement>(null);
 
   // Field background crossfade
@@ -438,7 +440,7 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
 
     beamTimerRef.current = setTimeout(() => {
       setBeamStruggle(null);
-      safeIntent(intent);
+      if (!stateRef.current.winner) safeIntent(intent);
     }, 1500);
   }
 
@@ -475,7 +477,7 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
     setBeamStruggle(beamData);
     beamTimerRef.current = setTimeout(() => {
       setBeamStruggle(null);
-      onEnemyAttackDone?.(intent);
+      if (!stateRef.current.winner) onEnemyAttackDone?.(intent);
     }, 1500);
 
     return () => { if (beamTimerRef.current) clearTimeout(beamTimerRef.current); };
@@ -490,6 +492,17 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
     return () => { if (itemAnimTimerRef.current) clearTimeout(itemAnimTimerRef.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingEnemyPlay]);
+
+  // Auto-advance draw phase when all piles are exhausted
+  useEffect(() => {
+    if (!isMyTurn || state.phase !== 'draw') return;
+    const allEmpty = (['hero', 'item', 'field'] as const).every(p => myPlayer.piles[p].length === 0);
+    if (!allEmpty) return;
+    const isFirstPlayerTurn1 =
+      state.players[tp].turnNumber === 1 && tp === state.firstPlayer;
+    if (isFirstPlayerTurn1) return;
+    onIntent({ type: 'advance_phase' });
+  }, [state, isMyTurn]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- Item / field card play animation ----
   function flushPendingCardDispatch() {
@@ -750,16 +763,23 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
       tp === state.firstPlayer;
 
     if (isFirstPlayerTurn1) {
+      setSelection({ mode: 'idle' });
       safeIntent({ type: 'advance_phase' });
       return;
     }
 
     if (state.phase === 'draw') return;
     if (state.phase === 'main2' || state.phase === 'end') {
+      setSelection({ mode: 'idle' });
       safeIntent({ type: 'end_turn' });
       onTurnEnd();
       return;
     }
+    if (state.phase === 'main1' && !moves.some(m => m.type === 'advance_phase')) {
+      showError('Deploy a hero before advancing');
+      return;
+    }
+    setSelection({ mode: 'idle' });
     safeIntent({ type: 'advance_phase' });
   }
 
@@ -1896,6 +1916,8 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
                     isCurrentTurnPlayer={!isMyTurn}
                     shaking={shakingSlots.has(`${oppId}-bench-${i}`)}
                     incomingDamage={damageSlots.get(`${oppId}-bench-${i}`)}
+                    effectiveAtk={f ? getEffectiveStats(f, 'bench', i, oppId, state).atk : undefined}
+                    effectiveDef={f ? getEffectiveStats(f, 'bench', i, oppId, state).def : undefined}
                     compact
                     onTap={() => handleSlotTap('bench', i, true)}
                   />
@@ -1925,6 +1947,8 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
                     compact={isCompact}
                     shaking={shakingSlots.has(`${oppId}-active-${i}`)}
                     incomingDamage={damageSlots.get(`${oppId}-active-${i}`)}
+                    effectiveAtk={f ? getEffectiveStats(f, 'active', i, oppId, state).atk : undefined}
+                    effectiveDef={f ? getEffectiveStats(f, 'active', i, oppId, state).def : undefined}
                     onTap={() => handleSlotTap('active', i, true)}
                   />
                 </div>
@@ -1958,6 +1982,8 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
                   canAttack={isMyTurn && state.phase === 'battle' && f !== null && !f.summoningSick && !f.hasAttackedThisTurn && myPlayer.kiCurrent >= getEffectiveStats(f, 'active', i, tp, state).attackKiCost}
                   shaking={shakingSlots.has(`${perspectiveId}-active-${i}`)}
                   incomingDamage={damageSlots.get(`${perspectiveId}-active-${i}`)}
+                  effectiveAtk={f ? getEffectiveStats(f, 'active', i, perspectiveId, state).atk : undefined}
+                  effectiveDef={f ? getEffectiveStats(f, 'active', i, perspectiveId, state).def : undefined}
                   onTap={() => handleSlotTap('active', i, false)}
                 />
               </div>
@@ -2000,6 +2026,8 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
                       compact
                       shaking={shakingSlots.has(`${perspectiveId}-bench-${i}`)}
                       incomingDamage={damageSlots.get(`${perspectiveId}-bench-${i}`)}
+                      effectiveAtk={f ? getEffectiveStats(f, 'bench', i, perspectiveId, state).atk : undefined}
+                      effectiveDef={f ? getEffectiveStats(f, 'bench', i, perspectiveId, state).def : undefined}
                       onTap={() => handleSlotTap('bench', i, false)}
                     />
                   </div>

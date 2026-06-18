@@ -17,6 +17,8 @@ interface FighterSlotProps {
   canAttack?: boolean;
   shaking?: boolean;
   incomingDamage?: { amount: number; seq: number };
+  effectiveAtk?: number;
+  effectiveDef?: number;
   onTap?: () => void;
 }
 
@@ -67,6 +69,8 @@ export default function FighterSlot({
   canAttack = false,
   shaking = false,
   incomingDamage,
+  effectiveAtk,
+  effectiveDef,
   onTap,
 }: FighterSlotProps) {
   // Empty slot
@@ -149,9 +153,12 @@ export default function FighterSlot({
   // Effective stats with equipment bonuses (respect Body Change swap)
   const bonus = equipBonuses(fighter.equipment);
   const swappedAtk = fighter.counters['swappedAtk'];
-  const displayAtk = (swappedAtk !== undefined ? swappedAtk : baseAtk) + bonus.atk;
-  const displayDef = baseDef + bonus.def;
-  const atkColor = swappedAtk !== undefined ? '#b44dff' : 'var(--atk)';
+  const rawAtk = (swappedAtk !== undefined ? swappedAtk : baseAtk) + bonus.atk;
+  const displayAtk = effectiveAtk !== undefined ? effectiveAtk : rawAtk;
+  const displayDef = effectiveDef !== undefined ? effectiveDef : baseDef + bonus.def;
+  const atkColor = (effectiveAtk !== undefined && effectiveAtk !== rawAtk)
+    ? 'var(--field)'
+    : swappedAtk !== undefined ? '#b44dff' : 'var(--atk)';
   const defColor = 'var(--def)';
 
   // Equipment cards full-size behind hero, offset so edge is visible

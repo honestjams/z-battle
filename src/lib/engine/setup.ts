@@ -53,21 +53,6 @@ export function createInitialState(
   const { hand: p1Hand, piles: p1FinalPiles } = dealOpeningHand(p1Piles);
   const { hand: p2Hand, piles: p2FinalPiles } = dealOpeningHand(p2Piles);
 
-  // Second player gets one extra card
-  const secondPlayer = firstPlayer === 'p1' ? 'p2' : 'p1';
-
-  // Build copies we can mutate for the extra card
-  let p1HandFinal = [...p1Hand];
-  let p2HandFinal = [...p2Hand];
-  let p1PilesFinal = { ...p1FinalPiles, hero: [...p1FinalPiles.hero] };
-  let p2PilesFinal = { ...p2FinalPiles, hero: [...p2FinalPiles.hero] };
-
-  if (secondPlayer === 'p2' && p2PilesFinal.hero.length > 0) {
-    p2HandFinal = [...p2HandFinal, p2PilesFinal.hero.shift()!];
-  } else if (secondPlayer === 'p1' && p1PilesFinal.hero.length > 0) {
-    p1HandFinal = [...p1HandFinal, p1PilesFinal.hero.shift()!];
-  }
-
   const makePlayerState = (
     deckId: string,
     hand: string[],
@@ -88,8 +73,8 @@ export function createInitialState(
     friendlySaiyanKoedThisGame: false,
   });
 
-  const p1State = makePlayerState(p1DeckId, p1HandFinal, p1PilesFinal, p1UserId);
-  const p2State = makePlayerState(p2DeckId, p2HandFinal, p2PilesFinal, p2UserId);
+  const p1State = makePlayerState(p1DeckId, p1Hand, p1FinalPiles, p1UserId);
+  const p2State = makePlayerState(p2DeckId, p2Hand, p2FinalPiles, p2UserId);
 
   // Set Ki for the first player (turn 1 = 1 Ki)
   const firstPlayerState = firstPlayer === 'p1' ? p1State : p2State;
