@@ -104,6 +104,27 @@ const CARD_IMAGES = [
   'images/gurus_house.png',
   'images/friezas_spaceship.png',
   'images/capital_of_the_cold_empire.png',
+  // The Grid (cars faction)
+  'images/car_ae86.png',
+  'images/car_civic_si.png',
+  'images/car_golf_gti.png',
+  'images/car_wrx_sti.png',
+  'images/car_evo_vi.png',
+  'images/car_m3_e36.png',
+  'images/car_gtr_r34.png',
+  'images/car_mustang_gt.png',
+  'images/car_corvette_c5.png',
+  'images/car_supra_mk4.png',
+  'images/car_t28_turbo.png',
+  'images/car_nos_kit.png',
+  'images/car_widebody_kit.png',
+  'images/car_coilovers.png',
+  'images/car_lsd.png',
+  'images/car_launch_control.png',
+  'images/car_race_fuel.png',
+  'images/car_spare_parts.png',
+  'images/car_nurburgring.png',
+  'images/car_suzuka.png',
 ];
 
 // Next.js image size buckets (imageSizes + deviceSizes combined for fill images)
