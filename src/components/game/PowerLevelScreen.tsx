@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { loadResults, type LocalGameResult } from '@/lib/localStats';
+import type { User } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase/client';
+import type { GameResult } from '@/lib/supabase/types';
 
 interface PowerLevelScreenProps {
+  user: User;
   onBack: () => void;
 }
-
-type GameResult = LocalGameResult;
 
 type SouterColor = 'green' | 'red' | 'purple' | 'blue';
 
@@ -33,6 +34,7 @@ function computeStats(results: GameResult[]) {
 
   const ai = byMode('ai');
   const hotseat = byMode('hotseat');
+  const online = byMode('online');
 
   // Favourite deck: most appearances across all modes
   const deckCounts: Record<string, number> = {};
@@ -52,11 +54,12 @@ function computeStats(results: GameResult[]) {
 
   // Power level: weighted score
   const totalWins = wins(results);
-  const power = totalWins * 150 + ai.length * 20;
+  const power = totalWins * 150 + ai.length * 20 + online.length * 40;
 
   return {
     ai: { games: ai.length, wins: wins(ai) },
     hotseat: { games: hotseat.length, wins: wins(hotseat) },
+    online: { games: online.length, wins: wins(online) },
     favDeck: favDeck ? { deck: favDeck[0], count: favDeck[1] } : null,
     bestDeck: bestDeck ? { deck: bestDeck[0], pct: bestDeckPct!, games: bestDeck[1].g } : null,
     power,
@@ -78,7 +81,7 @@ function WinBar({ wins, games, text, muted }: { wins: number; games: number; tex
   );
 }
 
-export default function PowerLevelScreen({ onBack }: PowerLevelScreenProps) {
+export default function PowerLevelScreen({ user, onBack }: PowerLevelScreenProps) {
   const [results, setResults] = useState<GameResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [colorKey, setColorKey] = useState<SouterColor>(() => {
@@ -100,9 +103,16 @@ export default function PowerLevelScreen({ onBack }: PowerLevelScreenProps) {
   }
 
   useEffect(() => {
-    setResults(loadResults());
-    setLoading(false);
-  }, []);
+    supabase
+      .from('game_results')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .then(({ data }) => {
+        setResults((data as GameResult[]) ?? []);
+        setLoading(false);
+      });
+  }, [user.id]);
 
   const stats = computeStats(results);
 
@@ -174,7 +184,7 @@ export default function PowerLevelScreen({ onBack }: PowerLevelScreenProps) {
             POWER LEVEL
           </div>
           <div style={{ fontFamily: 'Courier New, monospace', fontSize: 10, color: color.muted, letterSpacing: 2, marginTop: 2 }}>
-            COMBAT ANALYSIS
+            COMBAT ANALYSIS: {user.email}
           </div>
         </div>
 
@@ -196,6 +206,12 @@ export default function PowerLevelScreen({ onBack }: PowerLevelScreenProps) {
             <div style={{ fontFamily: 'Courier New, monospace', fontSize: 10, color: color.text, letterSpacing: 3, marginBottom: 4, fontWeight: 700 }}>▸ HOTSEAT</div>
             {row('GAMES ANALYZED', stats.hotseat.games)}
             {row('VICTORIES', <WinBar wins={stats.hotseat.wins} games={stats.hotseat.games} text={color.text} muted={color.muted} />)}
+
+            {/* ONLINE */}
+            {divider}
+            <div style={{ fontFamily: 'Courier New, monospace', fontSize: 10, color: color.text, letterSpacing: 3, marginBottom: 4, fontWeight: 700 }}>▸ ONLINE</div>
+            {row('GAMES ANALYZED', stats.online.games)}
+            {row('VICTORIES', <WinBar wins={stats.online.wins} games={stats.online.games} text={color.text} muted={color.muted} />)}
 
             {/* Deck analysis */}
             {divider}

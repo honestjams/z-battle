@@ -1,29 +1,50 @@
 'use client';
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
+import type { User } from '@supabase/supabase-js';
 import type { GameState, Intent, PlayerId } from '@/lib/engine/types';
 import { applyIntent, createInitialState } from '@/lib/engine';
 import { chooseMove } from '@/lib/engine/ai';
-import { recordResult } from '@/lib/localStats';
+import { supabase } from '@/lib/supabase/client';
+import type { Match } from '@/lib/supabase/types';
+import AuthScreen from '@/components/auth/AuthScreen';
+import LobbyScreen from '@/components/lobby/LobbyScreen';
+import FriendsScreen from '@/components/friends/FriendsScreen';
+import WaitingRoomScreen from '@/components/online/WaitingRoomScreen';
+import OnlineGameScreen from '@/components/online/OnlineGameScreen';
 import GameBoard from '@/components/game/GameBoard';
 import SetupScreen, { type GameMode } from '@/components/game/SetupScreen';
+import PassScreen from '@/components/game/PassScreen';
 import WinScreen from '@/components/game/WinScreen';
 import PowerLevelScreen from '@/components/game/PowerLevelScreen';
 import ImageCacheModal, { hasImagesCached } from '@/components/ui/ImageCacheModal';
 import DeckScoutModal from '@/components/game/DeckScoutModal';
 
-type Screen = 'setup' | 'pass' | 'game' | 'win' | 'power_level';
+type Screen =
+  | 'loading' | 'auth' | 'lobby' | 'friends'
+  | 'waiting_room' | 'online_game'
+  | 'setup' | 'pass' | 'game' | 'win' | 'power_level';
 
 const AI_PLAYER: PlayerId = 'p2';
 
+const DECK_OPTIONS = [
+  { id: 'saiyan', name: 'The Crew', color: '#ff7a18' },
+  { id: 'android', name: 'The Network', color: '#3aa6ff' },
+  { id: 'frieza_force', name: 'Icons', color: '#b44dff' },
+];
+
 export default function AppContent() {
-  const [screen, setScreen] = useState<Screen>('setup');
+  const [screen, setScreen] = useState<Screen>('loading');
+  const [user, setUser] = useState<User | null>(null);
+
+  const [activeMatchId, setActiveMatchId] = useState<string | null>(null);
+  const [myOnlineRole, setMyOnlineRole] = useState<PlayerId | null>(null);
 
   const [gameState, setGameState] = useState<GameState | null>(null);
   const gameStateRef = useRef<GameState | null>(null);
   useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
   const [aiPlayer, setAiPlayer] = useState<PlayerId | null>(null);
-  const [, setCurrentGameMode] = useState<GameMode>('hotseat');
+  const [currentGameMode, setCurrentGameMode] = useState<GameMode>('hotseat');
   const [winnerState, setWinnerState] = useState<{ winner: PlayerId; deck: string } | null>(null);
   const [showCacheModal, setShowCacheModal] = useState(false);
   const [pendingSetup, setPendingSetup] = useState<{
@@ -32,10 +53,98 @@ export default function AppContent() {
   const [pendingAiAttack, setPendingAiAttack] = useState<Intent | null>(null);
   const [pendingAiPlay, setPendingAiPlay] = useState<Intent | null>(null);
 
-  // Offer the one-time image pre-cache on first load
+  const [incomingChallenge, setIncomingChallenge] = useState<{
+    matchId: string;
+    challengerName: string;
+    challengerDeck: string;
+  } | null>(null);
+  const [acceptDeck, setAcceptDeck] = useState<string | null>(null);
+  const [acceptLoading, setAcceptLoading] = useState(false);
+
+  // Auth listener
   useEffect(() => {
-    if (!hasImagesCached()) setShowCacheModal(true);
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setUser(session.user);
+        setScreen('setup');
+        if (!hasImagesCached()) setShowCacheModal(true);
+      } else {
+        setScreen('auth');
+      }
+    }).catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error('Failed to fetch auth session:', err);
+      setScreen('auth');
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+      if (session?.user) {
+        setUser(session.user);
+        setScreen(s => {
+          if (s === 'auth' || s === 'loading') {
+            if (!hasImagesCached()) setShowCacheModal(true);
+            return 'setup';
+          }
+          return s;
+        });
+      } else {
+        setUser(null);
+        setIncomingChallenge(null);
+        setScreen(s => {
+          if (s === 'game' || s === 'pass') return s;
+          return 'auth';
+        });
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
+
+  // Incoming challenge listener
+  useEffect(() => {
+    if (!user) return;
+
+    supabase.from('matches').select('*')
+      .eq('player2', user.id).eq('status', 'invited')
+      .maybeSingle()
+      .then(async ({ data }) => {
+        if (!data) return;
+        const m = data as Match;
+        const { data: profile } = await supabase.from('profiles').select('display_name').eq('id', m.player1).single();
+        setIncomingChallenge({
+          matchId: m.id,
+          challengerName: profile?.display_name ?? 'Unknown',
+          challengerDeck: m.player1_deck ?? '',
+        });
+      });
+
+    const channel = supabase.channel(`challenges:${user.id}`)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'matches',
+        filter: `player2=eq.${user.id}`,
+      }, async (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const m = payload.new as Match;
+          if (m.status === 'invited') {
+            const { data: profile } = await supabase.from('profiles').select('display_name').eq('id', m.player1).single();
+            setIncomingChallenge({
+              matchId: m.id,
+              challengerName: profile?.display_name ?? 'Unknown',
+              challengerDeck: m.player1_deck ?? '',
+            });
+          }
+        } else if (payload.eventType === 'DELETE') {
+          const old = payload.old as { id?: string };
+          if (old.id) setIncomingChallenge(prev => prev?.matchId === old.id ? null : prev);
+        } else if (payload.eventType === 'UPDATE') {
+          const m = payload.new as Match;
+          if (m.status !== 'invited') setIncomingChallenge(prev => prev?.matchId === m.id ? null : prev);
+        }
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [user]);
 
   // AI turn runner
   const handleIntent = useCallback((intent: Intent) => {
@@ -58,11 +167,15 @@ export default function AppContent() {
 
     if (newState.winner) {
       setWinnerState({ winner: newState.winner, deck: newState.players[newState.winner].deck });
-      recordResult({
-        game_mode: aiPlayer ? 'ai' : 'hotseat',
-        deck: newState.players['p1'].deck,
-        won: newState.winner === 'p1',
-      });
+      if (user) {
+        const mode = aiPlayer ? 'ai' : 'hotseat';
+        supabase.from('game_results').insert({
+          user_id: user.id,
+          game_mode: mode,
+          deck: newState.players['p1'].deck,
+          won: newState.winner === 'p1',
+        }).then(() => {});
+      }
       setScreen('win');
       return;
     }
@@ -74,7 +187,7 @@ export default function AppContent() {
         setScreen('pass');
       }
     }
-  }, [aiPlayer]);
+  }, [aiPlayer, user]);
 
   useEffect(() => {
     if (!aiPlayer || screen !== 'game' || !gameState) return;
@@ -113,18 +226,111 @@ export default function AppContent() {
     setScreen(ai ? 'game' : 'pass');
   }
 
+  async function handleAcceptChallenge() {
+    if (!incomingChallenge || !acceptDeck || !user) return;
+    setAcceptLoading(true);
+
+    const { data: match } = await supabase.from('matches').select('*').eq('id', incomingChallenge.matchId).single();
+    if (!match) { setAcceptLoading(false); return; }
+
+    const m = match as Match;
+    const firstPlayer: PlayerId = Math.random() < 0.5 ? 'p1' : 'p2';
+    const gs = createInitialState(m.player1_deck!, acceptDeck, firstPlayer);
+
+    await supabase.from('matches').update({
+      player2_deck: acceptDeck,
+      state: gs,
+      status: 'active',
+      turn_player: gs.turnPlayer === 'p1' ? m.player1 : user.id,
+    }).eq('id', incomingChallenge.matchId);
+
+    setIncomingChallenge(null);
+    setAcceptDeck(null);
+    setAcceptLoading(false);
+    setActiveMatchId(incomingChallenge.matchId);
+    setMyOnlineRole('p2');
+    setScreen('online_game');
+  }
+
+  async function handleDeclineChallenge() {
+    if (!incomingChallenge) return;
+    await supabase.from('matches').delete().eq('id', incomingChallenge.matchId);
+    setIncomingChallenge(null);
+  }
+
   return (
     <main style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-start', minHeight: '100dvh', background: 'var(--bg)' }}>
 
-      {screen === 'power_level' && (
-        <PowerLevelScreen onBack={() => setScreen('setup')} />
+      {screen === 'loading' && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100dvh', width: '100%' }}>
+          <span style={{ fontFamily: 'Bangers, sans-serif', fontSize: 14, color: 'var(--muted)', letterSpacing: 2 }}>…</span>
+        </div>
+      )}
+
+      {screen === 'auth' && <AuthScreen />}
+
+      {screen === 'lobby' && user && (
+        <LobbyScreen
+          user={user}
+          onCreateMatch={(id) => { setActiveMatchId(id); setMyOnlineRole('p1'); setScreen('waiting_room'); }}
+          onJoinMatch={(id, role) => { setActiveMatchId(id); setMyOnlineRole(role); setScreen('online_game'); }}
+          onBack={() => setScreen('setup')}
+          onSignOut={() => supabase.auth.signOut()}
+        />
+      )}
+
+      {screen === 'power_level' && user && (
+        <PowerLevelScreen user={user} onBack={() => setScreen('setup')} />
+      )}
+
+      {screen === 'friends' && user && (
+        <FriendsScreen
+          user={user}
+          onChallenge={(id) => { setActiveMatchId(id); setMyOnlineRole('p1'); setScreen('waiting_room'); }}
+          onBack={() => setScreen('setup')}
+        />
+      )}
+
+      {screen === 'waiting_room' && user && activeMatchId && (
+        <WaitingRoomScreen
+          matchId={activeMatchId}
+          user={user}
+          onMatchStarted={(id, role) => { setActiveMatchId(id); setMyOnlineRole(role); setScreen('online_game'); }}
+          onCancel={() => { setActiveMatchId(null); setScreen('lobby'); }}
+        />
+      )}
+
+      {screen === 'online_game' && user && activeMatchId && myOnlineRole && (
+        <OnlineGameScreen
+          matchId={activeMatchId}
+          myRole={myOnlineRole}
+          user={user}
+          onGameEnd={(winner, deck, myDeck) => {
+            setWinnerState({ winner, deck });
+            setActiveMatchId(null);
+            if (user && myOnlineRole) {
+              supabase.from('game_results').insert({
+                user_id: user.id,
+                game_mode: 'online',
+                deck: myDeck,
+                won: winner === myOnlineRole,
+              }).then(() => {});
+            }
+            setScreen('win');
+          }}
+          onLeave={() => { setActiveMatchId(null); setScreen('lobby'); }}
+        />
       )}
 
       {screen === 'setup' && (
         <SetupScreen
           onStart={handleSetupStart}
-          onPowerLevel={() => setScreen('power_level')}
-          onCacheImages={() => setShowCacheModal(true)}
+          userEmail={user?.email}
+          onOpenFriends={user ? () => setScreen('friends') : undefined}
+          onPowerLevel={user ? () => setScreen('power_level') : undefined}
+          onVsFriend={user ? () => setScreen('lobby') : undefined}
+          onSignOut={user ? () => supabase.auth.signOut() : undefined}
+          onCacheImages={user ? () => setShowCacheModal(true) : undefined}
         />
       )}
 
@@ -200,6 +406,58 @@ export default function AppContent() {
           isVsAi={pendingSetup.mode === 'vs_ai'}
           onDone={handleScoutDone}
         />
+      )}
+
+      {incomingChallenge && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(13,15,20,0.85)',
+          display: 'flex', alignItems: 'flex-end', zIndex: 300,
+        }}>
+          <div style={{
+            width: '100%', maxWidth: 430, margin: '0 auto',
+            background: 'var(--bg)', borderRadius: '16px 16px 0 0',
+            padding: 20, display: 'flex', flexDirection: 'column', gap: 12,
+          }}>
+            <p style={{ fontFamily: 'Bangers, sans-serif', fontSize: 15, color: 'var(--ki)', margin: 0, letterSpacing: 1, textTransform: 'uppercase', textAlign: 'center' }}>
+              Challenge from {incomingChallenge.challengerName}!
+            </p>
+            <p style={{ fontFamily: 'Saira Condensed, sans-serif', fontSize: 11, color: 'var(--muted)', margin: 0, textAlign: 'center', textTransform: 'uppercase', letterSpacing: 1 }}>
+              They&apos;re playing {incomingChallenge.challengerDeck.replace('_', ' ')} — pick your deck
+            </p>
+            {DECK_OPTIONS.map(deck => (
+              <button key={deck.id} onClick={() => setAcceptDeck(deck.id)} style={{
+                background: acceptDeck === deck.id ? `${deck.color}22` : 'rgba(255,255,255,0.04)',
+                border: acceptDeck === deck.id ? `2px solid ${deck.color}` : '1.5px solid rgba(255,255,255,0.1)',
+                borderRadius: 8, padding: '10px 12px', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 8,
+              }}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: deck.color, flexShrink: 0 }} />
+                <span style={{ fontFamily: 'Saira Condensed, sans-serif', fontSize: 13, color: acceptDeck === deck.id ? deck.color : 'var(--ink)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  {deck.name}
+                </span>
+              </button>
+            ))}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={handleDeclineChallenge} style={{
+                flex: 1, background: 'transparent', border: '1px solid rgba(255,255,255,0.15)',
+                borderRadius: 10, padding: '12px', cursor: 'pointer',
+                fontFamily: 'Saira Condensed, sans-serif', fontSize: 12, color: 'var(--muted)',
+                letterSpacing: 1, textTransform: 'uppercase',
+              }}>DECLINE</button>
+              <button onClick={handleAcceptChallenge} disabled={!acceptDeck || acceptLoading} style={{
+                flex: 2,
+                background: acceptDeck && !acceptLoading ? 'linear-gradient(135deg, var(--ki), var(--ki2))' : 'rgba(255,255,255,0.06)',
+                border: 'none', borderRadius: 10, padding: '12px',
+                cursor: acceptDeck && !acceptLoading ? 'pointer' : 'not-allowed',
+                fontFamily: 'Bangers, sans-serif', fontSize: 14,
+                color: acceptDeck && !acceptLoading ? '#0d0f14' : 'var(--muted)',
+                letterSpacing: 1, textTransform: 'uppercase',
+              }}>
+                {acceptLoading ? '...' : 'ACCEPT'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
     </main>
