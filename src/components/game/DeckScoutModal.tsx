@@ -49,6 +49,8 @@ const DECK_LABELS: Record<string, string> = {
 };
 
 const MIN_DISPLAY_MS = 600;
+const PER_IMAGE_TIMEOUT_MS = 6000;
+const HARD_TIMEOUT_MS = 12000;
 
 export default function DeckScoutModal({ p1Deck, p2Deck, isVsAi = false, onDone }: DeckScoutModalProps) {
   const [loaded, setLoaded] = useState(0);
@@ -90,21 +92,33 @@ export default function DeckScoutModal({ p1Deck, p2Deck, isVsAi = false, onDone 
 
     if (n === 0) { finish(0); return; }
 
+    // Hard backstop: if individual image timeouts or load events somehow never
+    // resolve (e.g. a stuck network request that never fires load/error), this
+    // forces the scout to finish so the app never gets stuck behind asset loading.
+    const hardTimeout = setTimeout(() => finish(n), HARD_TIMEOUT_MS);
+
     for (const path of allImages) {
       for (const w of widths) {
         const url = `/_next/image?url=${encodeURIComponent('/' + path)}&w=${w}&q=75`;
         const img = new window.Image();
+        let settled = false;
         const done = () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeoutId);
           countRef.current += 1;
           const c = countRef.current;
           setLoaded(c);
           finish(c);
         };
+        const timeoutId = setTimeout(done, PER_IMAGE_TIMEOUT_MS);
         img.onload = done;
         img.onerror = done;
         img.src = url;
       }
     }
+
+    return () => clearTimeout(hardTimeout);
   // onDone is intentionally excluded — we only want this to run once on mount
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [p1Deck, p2Deck]);

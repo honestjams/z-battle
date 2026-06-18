@@ -147,21 +147,41 @@ interface PendingGame {
   mode: GameMode;
 }
 
+const LOADING_PER_IMAGE_TIMEOUT_MS = 6000;
+const LOADING_HARD_TIMEOUT_MS = 12000;
+
 function LoadingScreen({ pending, onReady }: { pending: PendingGame; onReady: () => void }) {
   useEffect(() => {
     const srcs = [...new Set([...getDeckImages(pending.p1Deck), ...getDeckImages(pending.p2Deck)])];
     if (srcs.length === 0) { onReady(); return; }
     let done = 0;
-    const finish = () => { done++; if (done >= srcs.length) onReady(); };
+    let readyCalled = false;
+    const ready = () => { if (!readyCalled) { readyCalled = true; onReady(); } };
+    const finish = () => { done++; if (done >= srcs.length) ready(); };
+
+    // Hard backstop: a stuck/never-resolving asset request must never block
+    // the app from proceeding into the game.
+    const hardTimeout = setTimeout(ready, LOADING_HARD_TIMEOUT_MS);
+
     for (const src of srcs) {
       const img = new window.Image();
+      let settled = false;
+      const settle = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeoutId);
+        finish();
+      };
+      const timeoutId = setTimeout(settle, LOADING_PER_IMAGE_TIMEOUT_MS);
       img.src = src;
       if (typeof img.decode === 'function') {
-        img.decode().then(finish).catch(finish);
+        img.decode().then(settle).catch(settle);
       } else {
-        img.onload = img.onerror = finish;
+        img.onload = img.onerror = settle;
       }
     }
+
+    return () => clearTimeout(hardTimeout);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
