@@ -76,7 +76,7 @@ export interface CardDef {
   name: string;
   cardType: 'hero' | 'item' | 'field';
   fighterType?: string;
-  tier?: 'basic' | 'mid' | 'high';
+  tier?: 'low' | 'medium' | 'high' | 'ultra';
   kiCost: number;
   hp?: number;
   atk?: number;

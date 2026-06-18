@@ -43,11 +43,9 @@ function getDeckImages(deckId: string): string[] {
 }
 
 const DECK_LABELS: Record<string, string> = {
-  saiyan: 'SAIYAN',
-  namekian: 'NAMEKIAN',
-  android: 'ANDROID',
-  human: 'EARTHLING',
-  frieza_force: 'FRIEZA FORCE',
+  saiyan: 'THE CREW',
+  android: 'THE NETWORK',
+  frieza_force: 'ICONS',
 };
 
 const MIN_DISPLAY_MS = 600;

@@ -163,7 +163,7 @@ export function evaluateCondition(
     }
     case 'friendly_saiyan_koed_this_game':
       return player.friendlySaiyanKoedThisGame;
-    case 'target_tier_is_basic':
+    case 'target_tier_is_low':
       // This condition is checked during attack resolution with target context, not here
       return false;
     default:

@@ -23,11 +23,9 @@ const SCOUTER_COLORS: Record<SouterColor, { bg: string; text: string; muted: str
 };
 
 const DECK_NAMES: Record<string, string> = {
-  saiyan: 'SAIYAN',
-  namekian: 'NAMEKIAN',
-  android: 'ANDROID',
-  human: 'EARTHLING',
-  frieza_force: 'FRIEZA FORCE',
+  saiyan: 'THE CREW',
+  android: 'THE NETWORK',
+  frieza_force: 'ICONS',
 };
 
 function computeStats(results: GameResult[]) {
