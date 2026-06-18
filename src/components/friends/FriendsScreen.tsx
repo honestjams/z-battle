@@ -188,7 +188,7 @@ export default function FriendsScreen({ user, onChallenge, onBack }: FriendsScre
     <div style={{
       width: '100%', maxWidth: 430, minHeight: '100dvh', margin: '0 auto',
       background: 'var(--bg)', display: 'flex', flexDirection: 'column',
-      padding: '16px 16px 32px', gap: 16, fontFamily: 'Saira, sans-serif',
+      padding: 'max(16px, env(safe-area-inset-top)) 16px max(48px, env(safe-area-inset-bottom))', gap: 16, fontFamily: 'Saira, sans-serif',
     }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>

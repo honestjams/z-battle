@@ -9,6 +9,12 @@ export type GameMode = 'hotseat' | 'vs_ai';
 
 interface SetupScreenProps {
   onStart: (p1Deck: string, p2Deck: string, firstPlayer: PlayerId, mode: GameMode) => void;
+  userEmail?: string | null;
+  onOpenFriends?: () => void;
+  onPowerLevel?: () => void;
+  onVsFriend?: () => void;
+  onSignOut?: () => void;
+  onCacheImages?: () => void;
 }
 
 const DECK_IDS = ['saiyan', 'namekian', 'android', 'human', 'frieza_force'];
@@ -148,10 +154,15 @@ function LoadingScreen({ pending, onReady }: { pending: PendingGame; onReady: ()
     const srcs = [...new Set([...getDeckImages(pending.p1Deck), ...getDeckImages(pending.p2Deck)])];
     if (srcs.length === 0) { onReady(); return; }
     let done = 0;
+    const finish = () => { done++; if (done >= srcs.length) onReady(); };
     for (const src of srcs) {
       const img = new window.Image();
-      img.onload = img.onerror = () => { done++; if (done >= srcs.length) onReady(); };
       img.src = src;
+      if (typeof img.decode === 'function') {
+        img.decode().then(finish).catch(finish);
+      } else {
+        img.onload = img.onerror = finish;
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -210,7 +221,7 @@ function LoadingScreen({ pending, onReady }: { pending: PendingGame; onReady: ()
   );
 }
 
-export default function SetupScreen({ onStart }: SetupScreenProps) {
+export default function SetupScreen({ onStart, userEmail, onOpenFriends, onPowerLevel, onVsFriend, onSignOut, onCacheImages }: SetupScreenProps) {
   const [screen, setScreen] = useState<'home' | 'setup' | 'loading'>('home');
   const [gameMode, setGameMode] = useState<GameMode>('vs_ai');
   const [p1Deck, setP1Deck] = useState<string | null>(null);
@@ -284,7 +295,7 @@ export default function SetupScreen({ onStart }: SetupScreenProps) {
             textTransform: 'uppercase',
             margin: '4px 0 0',
           }}>
-            Power Level Over 9000
+            {userEmail ?? 'Power Level Over 9000'}
           </p>
           <button
             onClick={() => setShowRulebook(true)}
@@ -311,6 +322,28 @@ export default function SetupScreen({ onStart }: SetupScreenProps) {
               textTransform: 'uppercase',
             }}>Rules</span>
           </button>
+          {onSignOut && (
+            <button
+              onClick={onSignOut}
+              style={{
+                position: 'absolute',
+                top: 36,
+                left: 0,
+                background: 'transparent',
+                border: '1px solid var(--line)',
+                borderRadius: 8,
+                padding: '6px 10px',
+                cursor: 'pointer',
+                fontFamily: 'Saira Condensed, sans-serif',
+                fontSize: 10,
+                color: 'var(--muted)',
+                textTransform: 'uppercase',
+                letterSpacing: 1,
+              }}
+            >
+              SIGN OUT
+            </button>
+          )}
         </div>
 
         {/* Mode buttons — vertical */}
@@ -386,53 +419,111 @@ export default function SetupScreen({ onStart }: SetupScreenProps) {
             <div style={{ display: 'flex', alignItems: 'center', paddingRight: 18, color: '#3aa6ff', fontSize: 22, opacity: 0.55 }}>›</div>
           </button>
 
-          {/* VS FRIEND — coming soon */}
-          <div style={{
-            background: 'rgba(255,255,255,0.025)',
-            border: '1.5px solid rgba(255,255,255,0.07)',
-            borderRadius: 14,
-            padding: 0,
-            display: 'flex',
-            alignItems: 'stretch',
-            overflow: 'hidden',
-            opacity: 0.5,
-          }}>
-            <div style={{ width: 4, background: 'var(--muted)', opacity: 0.4, flexShrink: 0 }} />
-            <div style={{ padding: '18px 16px', flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 9, lineHeight: 1 }}>
-                <span style={{
+          {/* VS FRIEND */}
+          {onVsFriend ? (
+            <button
+              onClick={onVsFriend}
+              style={{
+                background: 'rgba(180,77,255,0.07)',
+                border: '1.5px solid rgba(180,77,255,0.28)',
+                borderRadius: 14,
+                padding: 0,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'stretch',
+                textAlign: 'left',
+                overflow: 'hidden',
+                width: '100%',
+              }}
+            >
+              <div style={{ width: 4, background: '#b44dff', flexShrink: 0 }} />
+              <div style={{ padding: '18px 16px', flex: 1 }}>
+                <div style={{
                   fontFamily: 'Bangers, sans-serif',
                   fontSize: 24,
                   letterSpacing: 2,
+                  color: '#b44dff',
+                  lineHeight: 1,
+                }}>VS FRIEND</div>
+                <div style={{
+                  fontFamily: 'Saira Condensed, sans-serif',
+                  fontSize: 12,
                   color: 'var(--muted)',
-                }}>VS FRIEND</span>
-                <span style={{
-                  fontFamily: 'Bangers, sans-serif',
-                  fontSize: 9,
-                  letterSpacing: 1,
-                  color: 'var(--ki2)',
-                  background: 'rgba(255,182,72,0.12)',
-                  border: '1px solid rgba(255,182,72,0.28)',
-                  borderRadius: 4,
-                  padding: '2px 5px',
-                  lineHeight: 1.5,
-                }}>SOON</span>
+                  marginTop: 4,
+                  letterSpacing: 0.5,
+                }}>Online multiplayer</div>
               </div>
-              <div style={{
-                fontFamily: 'Saira Condensed, sans-serif',
-                fontSize: 12,
-                color: 'var(--muted)',
-                marginTop: 4,
-                letterSpacing: 0.5,
-              }}>Online multiplayer</div>
+              <div style={{ display: 'flex', alignItems: 'center', paddingRight: 18, color: '#b44dff', fontSize: 22, opacity: 0.55 }}>›</div>
+            </button>
+          ) : (
+            <div style={{
+              background: 'rgba(255,255,255,0.025)',
+              border: '1.5px solid rgba(255,255,255,0.07)',
+              borderRadius: 14,
+              padding: 0,
+              display: 'flex',
+              alignItems: 'stretch',
+              overflow: 'hidden',
+              opacity: 0.5,
+            }}>
+              <div style={{ width: 4, background: 'var(--muted)', opacity: 0.4, flexShrink: 0 }} />
+              <div style={{ padding: '18px 16px', flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 9, lineHeight: 1 }}>
+                  <span style={{
+                    fontFamily: 'Bangers, sans-serif',
+                    fontSize: 24,
+                    letterSpacing: 2,
+                    color: 'var(--muted)',
+                  }}>VS FRIEND</span>
+                  <span style={{
+                    fontFamily: 'Bangers, sans-serif',
+                    fontSize: 9,
+                    letterSpacing: 1,
+                    color: 'var(--ki2)',
+                    background: 'rgba(255,182,72,0.12)',
+                    border: '1px solid rgba(255,182,72,0.28)',
+                    borderRadius: 4,
+                    padding: '2px 5px',
+                    lineHeight: 1.5,
+                  }}>SOON</span>
+                </div>
+                <div style={{
+                  fontFamily: 'Saira Condensed, sans-serif',
+                  fontSize: 12,
+                  color: 'var(--muted)',
+                  marginTop: 4,
+                  letterSpacing: 0.5,
+                }}>Online multiplayer</div>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Utility row */}
         <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-          {(['Friends List', 'Power Level'] as const).map(label => (
-            <div key={label} style={{
+          {onOpenFriends ? (
+            <button onClick={onOpenFriends} style={{
+              flex: 1,
+              background: 'rgba(255,255,255,0.05)',
+              border: '1.5px solid rgba(255,255,255,0.14)',
+              borderRadius: 12,
+              padding: '14px 12px',
+              cursor: 'pointer',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 5,
+            }}>
+              <span style={{
+                fontFamily: 'Bangers, sans-serif',
+                fontSize: 14,
+                letterSpacing: 1.5,
+                color: 'var(--ink)',
+                textTransform: 'uppercase',
+              }}>Friends List</span>
+            </button>
+          ) : (
+            <div style={{
               flex: 1,
               background: 'rgba(255,255,255,0.025)',
               border: '1.5px solid rgba(255,255,255,0.07)',
@@ -450,7 +541,7 @@ export default function SetupScreen({ onStart }: SetupScreenProps) {
                 letterSpacing: 1.5,
                 color: 'var(--muted)',
                 textTransform: 'uppercase',
-              }}>{label}</span>
+              }}>Friends List</span>
               <span style={{
                 fontFamily: 'Bangers, sans-serif',
                 fontSize: 9,
@@ -462,8 +553,74 @@ export default function SetupScreen({ onStart }: SetupScreenProps) {
                 padding: '1px 5px',
               }}>SOON</span>
             </div>
-          ))}
+          )}
+          {onPowerLevel ? (
+            <button onClick={onPowerLevel} style={{
+              flex: 1,
+              background: 'rgba(255,255,255,0.05)',
+              border: '1.5px solid rgba(255,255,255,0.14)',
+              borderRadius: 12,
+              padding: '14px 12px',
+              cursor: 'pointer',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 5,
+            }}>
+              <span style={{
+                fontFamily: 'Bangers, sans-serif',
+                fontSize: 14,
+                letterSpacing: 1.5,
+                color: 'var(--ink)',
+                textTransform: 'uppercase',
+              }}>Power Level</span>
+            </button>
+          ) : (
+            <div style={{
+              flex: 1,
+              background: 'rgba(255,255,255,0.025)',
+              border: '1.5px solid rgba(255,255,255,0.07)',
+              borderRadius: 12,
+              padding: '14px 12px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 5,
+              opacity: 0.5,
+            }}>
+              <span style={{
+                fontFamily: 'Bangers, sans-serif',
+                fontSize: 14,
+                letterSpacing: 1.5,
+                color: 'var(--muted)',
+                textTransform: 'uppercase',
+              }}>Power Level</span>
+              <span style={{
+                fontFamily: 'Bangers, sans-serif',
+                fontSize: 9,
+                letterSpacing: 1,
+                color: 'var(--ki2)',
+                background: 'rgba(255,182,72,0.1)',
+                border: '1px solid rgba(255,182,72,0.22)',
+                borderRadius: 3,
+                padding: '1px 5px',
+              }}>SOON</span>
+            </div>
+          )}
         </div>
+
+        {/* Pre-load images */}
+        {onCacheImages && (
+          <button onClick={onCacheImages} style={{
+            background: 'transparent', border: 'none', cursor: 'pointer',
+            fontFamily: 'Saira Condensed, sans-serif', fontSize: 10,
+            color: 'var(--line)', letterSpacing: 1, textTransform: 'uppercase',
+            textDecoration: 'underline', textDecorationColor: 'var(--line)',
+            padding: '2px 0', alignSelf: 'center', marginTop: 8,
+          }}>
+            ◈ pre-load card images
+          </button>
+        )}
 
         {showRulebook && <RulebookModal onClose={() => setShowRulebook(false)} />}
       </div>

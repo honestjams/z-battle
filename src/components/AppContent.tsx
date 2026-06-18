@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import type { User } from '@supabase/supabase-js';
 import type { GameState, Intent, PlayerId } from '@/lib/engine/types';
 import { applyIntent, createInitialState } from '@/lib/engine';
@@ -43,6 +43,8 @@ export default function AppContent() {
   const [myOnlineRole, setMyOnlineRole] = useState<PlayerId | null>(null);
 
   const [gameState, setGameState] = useState<GameState | null>(null);
+  const gameStateRef = useRef<GameState | null>(null);
+  useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
   const [aiPlayer, setAiPlayer] = useState<PlayerId | null>(null);
   const [currentGameMode, setCurrentGameMode] = useState<GameMode>('hotseat');
   const [winnerState, setWinnerState] = useState<{ winner: PlayerId; deck: string } | null>(null);
@@ -66,7 +68,7 @@ export default function AppContent() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         setUser(session.user);
-        setScreen('lobby');
+        setScreen('setup');
         if (!hasImagesCached()) setShowCacheModal(true);
       } else {
         setScreen('auth');
@@ -79,14 +81,17 @@ export default function AppContent() {
         setScreen(s => {
           if (s === 'auth' || s === 'loading') {
             if (!hasImagesCached()) setShowCacheModal(true);
-            return 'lobby';
+            return 'setup';
           }
           return s;
         });
       } else {
         setUser(null);
-        setScreen('auth');
         setIncomingChallenge(null);
+        setScreen(s => {
+          if (s === 'game' || s === 'pass') return s;
+          return 'auth';
+        });
       }
     });
 
@@ -141,9 +146,11 @@ export default function AppContent() {
 
   // AI turn runner
   const handleIntent = useCallback((intent: Intent) => {
-    if (!gameState) return;
-    const prevTurnPlayer = gameState.turnPlayer;
-    let newState = applyIntent(gameState, intent);
+    const gs = gameStateRef.current;
+    if (!gs) return;
+    if (gs.winner) return;
+    const prevTurnPlayer = gs.turnPlayer;
+    let newState = applyIntent(gs, intent);
 
     if (aiPlayer) {
       while (newState.pendingPromotions.length > 0 && newState.pendingPromotions[0].side === aiPlayer) {
@@ -178,7 +185,7 @@ export default function AppContent() {
         setScreen('pass');
       }
     }
-  }, [gameState, aiPlayer, user]);
+  }, [aiPlayer, user]);
 
   useEffect(() => {
     if (!aiPlayer || screen !== 'game' || !gameState) return;
@@ -265,23 +272,20 @@ export default function AppContent() {
           user={user}
           onCreateMatch={(id) => { setActiveMatchId(id); setMyOnlineRole('p1'); setScreen('waiting_room'); }}
           onJoinMatch={(id, role) => { setActiveMatchId(id); setMyOnlineRole(role); setScreen('online_game'); }}
-          onPlayOffline={() => setScreen('setup')}
-          onOpenFriends={() => setScreen('friends')}
-          onPowerLevel={() => setScreen('power_level')}
-          onCacheImages={() => setShowCacheModal(true)}
+          onBack={() => setScreen('setup')}
           onSignOut={() => supabase.auth.signOut()}
         />
       )}
 
       {screen === 'power_level' && user && (
-        <PowerLevelScreen user={user} onBack={() => setScreen('lobby')} />
+        <PowerLevelScreen user={user} onBack={() => setScreen('setup')} />
       )}
 
       {screen === 'friends' && user && (
         <FriendsScreen
           user={user}
           onChallenge={(id) => { setActiveMatchId(id); setMyOnlineRole('p1'); setScreen('waiting_room'); }}
-          onBack={() => setScreen('lobby')}
+          onBack={() => setScreen('setup')}
         />
       )}
 
@@ -316,7 +320,17 @@ export default function AppContent() {
         />
       )}
 
-      {screen === 'setup' && <SetupScreen onStart={handleSetupStart} />}
+      {screen === 'setup' && (
+        <SetupScreen
+          onStart={handleSetupStart}
+          userEmail={user?.email}
+          onOpenFriends={user ? () => setScreen('friends') : undefined}
+          onPowerLevel={user ? () => setScreen('power_level') : undefined}
+          onVsFriend={user ? () => setScreen('lobby') : undefined}
+          onSignOut={user ? () => supabase.auth.signOut() : undefined}
+          onCacheImages={user ? () => setShowCacheModal(true) : undefined}
+        />
+      )}
 
       {(screen === 'game' || screen === 'pass') && gameState && (
         <>
@@ -375,7 +389,7 @@ export default function AppContent() {
         <WinScreen
           winner={winnerState.winner}
           winnerDeck={winnerState.deck}
-          onPlayAgain={() => { setGameState(null); setAiPlayer(null); setWinnerState(null); setScreen('lobby'); }}
+          onPlayAgain={() => { setGameState(null); setAiPlayer(null); setWinnerState(null); setScreen('setup'); }}
         />
       )}
 

@@ -18,14 +18,11 @@ interface LobbyScreenProps {
   user: User;
   onCreateMatch: (matchId: string) => void;
   onJoinMatch: (matchId: string, myRole: PlayerId) => void;
-  onPlayOffline: () => void;
-  onOpenFriends: () => void;
-  onPowerLevel: () => void;
-  onCacheImages: () => void;
+  onBack: () => void;
   onSignOut: () => void;
 }
 
-export default function LobbyScreen({ user, onCreateMatch, onJoinMatch, onPlayOffline, onOpenFriends, onPowerLevel, onCacheImages, onSignOut }: LobbyScreenProps) {
+export default function LobbyScreen({ user, onCreateMatch, onJoinMatch, onBack, onSignOut }: LobbyScreenProps) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [openMatches, setOpenMatches] = useState<Match[]>([]);
   const [myMatches, setMyMatches] = useState<Match[]>([]);
@@ -116,9 +113,15 @@ export default function LobbyScreen({ user, onCreateMatch, onJoinMatch, onPlayOf
       padding: 'max(16px, env(safe-area-inset-top)) 16px max(32px, env(safe-area-inset-bottom))', gap: 16, fontFamily: 'Saira, sans-serif',
     }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div>
-          <h1 style={{ fontFamily: 'Bangers, sans-serif', fontSize: 28, color: 'var(--ki)', margin: 0, letterSpacing: 2 }}>Z-BATTLE</h1>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <button onClick={onBack} style={{
+          background: 'transparent', border: '1px solid var(--line)',
+          borderRadius: 8, padding: '6px 12px', cursor: 'pointer',
+          fontFamily: 'Saira Condensed, sans-serif', fontSize: 11,
+          color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 1, flexShrink: 0,
+        }}>← BACK</button>
+        <div style={{ flex: 1 }}>
+          <h1 style={{ fontFamily: 'Bangers, sans-serif', fontSize: 24, color: 'var(--ki)', margin: 0, letterSpacing: 2 }}>ONLINE</h1>
           <p style={{ fontFamily: 'Saira Condensed, sans-serif', fontSize: 10, color: 'var(--muted)', margin: 0, letterSpacing: 1, textTransform: 'uppercase' }}>
             {profile?.display_name ?? user.email}
           </p>
@@ -132,45 +135,6 @@ export default function LobbyScreen({ user, onCreateMatch, onJoinMatch, onPlayOf
           SIGN OUT
         </button>
       </div>
-
-      {/* Quick actions */}
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button onClick={onPlayOffline} style={{
-          flex: 1, background: 'rgba(255,255,255,0.04)', border: '1.5px solid rgba(255,255,255,0.1)',
-          borderRadius: 12, padding: '14px', cursor: 'pointer',
-          fontFamily: 'Bangers, sans-serif', fontSize: 13, color: 'var(--muted)',
-          letterSpacing: 1, textTransform: 'uppercase',
-        }}>
-          OFFLINE / AI
-        </button>
-        <button onClick={onOpenFriends} style={{
-          flex: 1, background: 'rgba(255,255,255,0.04)', border: '1.5px solid rgba(255,255,255,0.1)',
-          borderRadius: 12, padding: '14px', cursor: 'pointer',
-          fontFamily: 'Bangers, sans-serif', fontSize: 13, color: 'var(--muted)',
-          letterSpacing: 1, textTransform: 'uppercase',
-        }}>
-          FRIENDS
-        </button>
-        <button onClick={onPowerLevel} style={{
-          flex: 1, background: 'rgba(255,255,255,0.04)', border: '1.5px solid rgba(255,255,255,0.1)',
-          borderRadius: 12, padding: '14px', cursor: 'pointer',
-          fontFamily: 'Bangers, sans-serif', fontSize: 13, color: 'var(--muted)',
-          letterSpacing: 1, textTransform: 'uppercase',
-        }}>
-          POWER LEVEL
-        </button>
-      </div>
-
-      {/* Image pre-cache trigger */}
-      <button onClick={onCacheImages} style={{
-        background: 'transparent', border: 'none', cursor: 'pointer',
-        fontFamily: 'Saira Condensed, sans-serif', fontSize: 10,
-        color: 'var(--line)', letterSpacing: 1, textTransform: 'uppercase',
-        textDecoration: 'underline', textDecorationColor: 'var(--line)',
-        padding: '2px 0', alignSelf: 'center',
-      }}>
-        ◈ pre-load card images
-      </button>
 
       {/* Create Online Match */}
       <div style={panel}>
