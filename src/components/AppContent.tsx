@@ -71,6 +71,10 @@ export default function AppContent() {
       } else {
         setScreen('auth');
       }
+    }).catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error('Failed to fetch auth session:', err);
+      setScreen('auth');
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
