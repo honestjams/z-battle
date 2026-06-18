@@ -46,6 +46,7 @@ const DECK_LABELS: Record<string, string> = {
   saiyan: 'THE CREW',
   android: 'THE NETWORK',
   frieza_force: 'ICONS',
+  cars: 'THE GRID',
 };
 
 const MIN_DISPLAY_MS = 600;
