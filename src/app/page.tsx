@@ -3,7 +3,7 @@
 import React, { useState, useRef } from 'react';
 
 // AppContent is lazy-loaded on demand — keeps the initial bundle tiny
-type Phase = 'splash' | 'loading' | 'ready';
+type Phase = 'splash' | 'loading' | 'ready' | 'error';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyComponent = React.ComponentType<any>;
@@ -30,6 +30,11 @@ export default function Home() {
       // Wrap in arrow fn so React doesn't treat the component as a state updater
       setAppContent(() => mod.default as AnyComponent);
       setTimeout(() => setPhase('ready'), 500);
+    }).catch((err) => {
+      if (timerRef.current) clearInterval(timerRef.current);
+      // eslint-disable-next-line no-console
+      console.error('Failed to load app bundle:', err);
+      setPhase('error');
     });
   }
 
@@ -153,6 +158,33 @@ export default function Home() {
               </span>
               <span style={{ fontSize: 11, color: vivid, letterSpacing: 1 }}>{pct}%</span>
             </div>
+          </>
+        )}
+
+        {/* ── Error: bundle failed to load ── */}
+        {phase === 'error' && (
+          <>
+            <div style={{ fontSize: 10, color: vivid, letterSpacing: 1, marginBottom: 16, lineHeight: 1.6 }}>
+              SYSTEMS FAILED TO INITIALISE.<br />Check your connection and retry.
+            </div>
+            <button
+              onClick={() => { setProgress(0); handlePowerUp(); }}
+              style={{
+                width: '100%',
+                padding: '14px 0',
+                background: `${vivid}12`,
+                border: `2px solid ${vivid}`,
+                borderRadius: 4,
+                cursor: 'pointer',
+                fontFamily: 'Courier New, monospace',
+                fontWeight: 700,
+                fontSize: 14,
+                color: vivid,
+                letterSpacing: 5,
+              }}
+            >
+              RETRY
+            </button>
           </>
         )}
       </div>
