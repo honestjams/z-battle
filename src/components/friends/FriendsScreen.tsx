@@ -6,11 +6,9 @@ import { supabase } from '@/lib/supabase/client';
 import type { Friendship, Profile } from '@/lib/supabase/types';
 
 const DECK_OPTIONS = [
-  { id: 'saiyan', name: 'Saiyan', color: '#ff7a18' },
-  { id: 'namekian', name: 'Namekian', color: '#34c759' },
-  { id: 'android', name: 'Android', color: '#3aa6ff' },
-  { id: 'human', name: 'Human', color: '#ffb648' },
-  { id: 'frieza_force', name: 'Frieza Force', color: '#b44dff' },
+  { id: 'saiyan', name: 'The Crew', color: '#ff7a18' },
+  { id: 'android', name: 'The Network', color: '#3aa6ff' },
+  { id: 'frieza_force', name: 'Icons', color: '#b44dff' },
 ];
 
 interface FriendsScreenProps {

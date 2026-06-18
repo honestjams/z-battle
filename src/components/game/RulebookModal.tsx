@@ -170,8 +170,8 @@ export default function RulebookModal({ onClose }: RulebookModalProps) {
 
         {/* ---- DECKS ---- */}
         <Section title="Decks & Cards">
-          <Rule>Each player picks one of five faction decks: <Pill label="SAIYAN" color="#ff7a18" /><Pill label="NAMEKIAN" color="#34c759" /><Pill label="ANDROID" color="#3aa6ff" /><Pill label="EARTHLING" color="#ffb648" /><Pill label="FRIEZA FORCE" color="#b44dff" /></Rule>
-          <Rule>Every deck has three separate face-down piles: <strong>10 Hero cards</strong>, <strong>8 Item cards</strong>, and <strong>2 Field cards</strong>.</Rule>
+          <Rule>Each player picks one of three faction decks: <Pill label="THE CREW" color="#ff7a18" /><Pill label="THE NETWORK" color="#3aa6ff" /><Pill label="ICONS" color="#b44dff" /></Rule>
+          <Rule>Every deck has three separate face-down piles: Hero cards, Item cards, and Field cards.</Rule>
           <Rule>Cards are never shuffled together — each pile is drawn from independently.</Rule>
         </Section>
 

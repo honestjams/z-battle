@@ -308,12 +308,12 @@ export function resolveBasicAttack(
 
   let atkValue = attackerStats.atk;
 
-  // Raditz/Dodoria "target_tier_is_basic" conditional
+  // "target_tier_is_low" conditional (bonus ATK vs Low-tier targets)
   const targetCard = getCard(target.cardId);
   for (const ab of getCard(attacker.cardId).abilities) {
     if (ab.kind === 'conditional') {
       const p = ab.params as any;
-      if (p.condition === 'target_tier_is_basic' && targetCard.tier === 'basic') {
+      if (p.condition === 'target_tier_is_low' && targetCard.tier === 'low') {
         atkValue += p.atk ?? 0;
       }
     }
