@@ -129,6 +129,9 @@ function optimisedUrl(path: string, w: number): string {
 
 type Mode = 'prompt' | 'loading' | 'done';
 
+const PER_IMAGE_TIMEOUT_MS = 6000;
+const HARD_TIMEOUT_MS = 15000;
+
 interface ImageCacheModalProps {
   onClose: () => void;
 }
@@ -160,19 +163,36 @@ export default function ImageCacheModal({ onClose }: ImageCacheModalProps) {
     const n_total = CARD_IMAGES.length * widths.length;
     setTotal(n_total);
 
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      localStorage.setItem(CACHE_STORAGE_KEY, '1');
+      setMode('done');
+      setTimeout(onClose, 1800);
+    };
+
+    // Hard backstop: guarantees the modal closes even if individual image
+    // timeouts somehow never fire, so a stuck asset can never block the app.
+    const hardTimeout = setTimeout(finish, HARD_TIMEOUT_MS);
+
     for (const path of CARD_IMAGES) {
       for (const w of widths) {
         const img = new window.Image();
+        let settled = false;
         const done = () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeoutId);
           countRef.current += 1;
           const n = countRef.current;
           setLoaded(n);
           if (n === n_total) {
-            localStorage.setItem(CACHE_STORAGE_KEY, '1');
-            setMode('done');
-            setTimeout(onClose, 1800);
+            clearTimeout(hardTimeout);
+            finish();
           }
         };
+        const timeoutId = setTimeout(done, PER_IMAGE_TIMEOUT_MS);
         img.onload = done;
         img.onerror = done;
         img.src = optimisedUrl(path, w);
