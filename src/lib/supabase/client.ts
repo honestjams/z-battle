@@ -1,13 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// Public project defaults. These are safe to ship in the client bundle:
+// the publishable (anon) key is designed for browser exposure, and all data
+// access is gated by Row Level Security policies on the database. Env vars
+// override these when set (e.g. to point at a different project).
+const DEFAULT_SUPABASE_URL = 'https://eahuaeuryxbvwegqmwdx.supabase.co';
+const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_ESqIv3Kq8tiYF2CJAqWlkg_kXj0JsSR';
 
-if (!url || !key) {
-  // eslint-disable-next-line no-console
-  console.error('Missing NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY — online features will be unavailable.');
-}
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL || DEFAULT_SUPABASE_URL;
+const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY;
 
-// Fall back to placeholder values so createClient doesn't throw at module-load
-// time and break the app's initial bundle import when env vars are absent.
-export const supabase = createClient(url || 'https://placeholder.supabase.co', key || 'placeholder');
+export const supabase = createClient(url, key);
