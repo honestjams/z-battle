@@ -2108,6 +2108,7 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
             return (
               <div
                 key={`${cardId}-${origIdx}`}
+                draggable={false}
                 onContextMenu={(e) => e.preventDefault()}
                 onPointerDown={(e) => {
                   // Start long-press timer — fires regardless of drag permission
@@ -2152,11 +2153,22 @@ export default function GameBoard({ state, onIntent, onTurnEnd, perspective, pen
                     setZoomedCard({ cardId, handIdx: origIdx });
                     return;
                   }
+                  // Clear ref first — prevents the global window pointerup from double-dispatching
+                  dragRef.current = null;
+                  setDrag(null);
                   if (!d.active) {
-                    dragRef.current = null;
-                    setDrag(null);
                     setSelection({ mode: 'idle' });
                     setZoomedCard({ cardId, handIdx: origIdx });
+                  } else {
+                    // Dispatch drop here so fast drags on desktop work even if the
+                    // global useEffect listener wasn't registered yet (fires after re-render)
+                    const target = getDropTarget(e.clientX, e.clientY);
+                    if (target) {
+                      const keep = dispatchDropRef.current(d, target);
+                      if (!keep) setSelection({ mode: 'idle' });
+                    } else {
+                      setSelection({ mode: 'idle' });
+                    }
                   }
                 }}
                 onPointerCancel={() => {
